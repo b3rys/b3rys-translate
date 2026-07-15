@@ -1,0 +1,36 @@
+b3rys translate
+Copyright 2026 b3rys
+
+This product is licensed under the Apache License, Version 2.0 (the "License").
+You may obtain a copy of the License in the accompanying LICENSE file or at:
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+================================================================================
+Attribution
+================================================================================
+
+Original project : b3rys translate
+Author           : b3rys
+Source           : https://github.com/b3rys/b3rys-translate
+
+When redistributing this software or any derivative works, please retain the
+copyright notice above, this NOTICE file, and the LICENSE file, and clearly
+attribute the original project as required by Section 4 of the Apache License.
+
+================================================================================
+Third-party components
+================================================================================
+
+This project is built with, and may include or reference, the following
+third-party software. Each remains under its own license.
+
+  - WXT (Web Extension Framework) — MIT License — https://wxt.dev/
+  - Vite — MIT License — https://vitejs.dev/
+  - DM Mono, Outfit (UI fonts, loaded at runtime from Google Fonts)
+        SIL Open Font License 1.1 — https://fonts.google.com/
+
+Translation is performed by third-party engine APIs (Google Gemini, OpenAI,
+Anthropic) selected and configured by the end user with their own API keys.
+Those services are governed by their respective providers' terms and are not
+part of, nor redistributed by, this project.

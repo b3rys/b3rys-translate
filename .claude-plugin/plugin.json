@@ -1,0 +1,8 @@
+{
+  "name": "b3",
+  "version": "0.5.0",
+  "description": "b3rys translate — install and use the bilingual translation Chrome extension from Claude Code. Provides /b3:translate.",
+  "author": { "name": "b3rys" },
+  "homepage": "https://github.com/b3rys/b3rys-translate",
+  "repository": "https://github.com/b3rys/b3rys-translate"
+}

@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Page Title — b3rys</title>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Geist+Mono:wght@300;400;500&family=Noto+Sans+KR:wght@300;400;500;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Design System -->
+    <link rel="stylesheet" href="tokens.css" />
+    <link rel="stylesheet" href="base.css" />
+    <link rel="stylesheet" href="components.css" />
+  </head>
+  <body>
+    <div class="grid-bg"></div>
+
+    <!-- ═══════ HERO ═══════ -->
+    <!--
+<section class="hero">
+  <div class="hero-glow"></div>
+  <div class="container">
+    <div class="hero-label"><span>Label Text</span></div>
+    <h1 class="hero-title">Title with <em>accent</em></h1>
+    <p class="hero-sub">Subtitle in mono</p>
+    <p class="hero-desc">
+      Description text. Use <strong>strong</strong> for emphasis.
+    </p>
+  </div>
+  <div class="hero-scroll">
+    <div class="scroll-line"></div>
+    SCROLL
+  </div>
+</section>
+-->
+
+    <!-- ═══════ SECTION ═══════ -->
+    <!--
+<section class="section">
+  <div class="container">
+    <div class="reveal">
+      <div class="section-number">01 — SECTION LABEL</div>
+      <h2 class="section-title">Section Title</h2>
+      <p class="section-subtitle">Section subtitle with description.</p>
+    </div>
+
+    Card Grid (2 columns):
+    <div class="card-grid reveal">
+      <div class="card">
+        <div class="card-icon"><svg>...</svg></div>
+        <div class="card-title">Card Title</div>
+        <div class="card-text">Card description text.</div>
+      </div>
+    </div>
+
+    Card Grid (3 columns):
+    <div class="card-grid card-grid--three reveal">
+      <div class="card">...</div>
+    </div>
+
+    Flywheel:
+    <div class="flywheel reveal">
+      <div class="flywheel-step">
+        <div class="flywheel-num">01</div>
+        <div class="flywheel-label">Step Name</div>
+        <div class="flywheel-desc">Step description</div>
+      </div>
+    </div>
+
+    Timeline:
+    <div class="timeline reveal">
+      <div class="timeline-item">
+        <div class="timeline-phase">Phase 1 — Label</div>
+        <div class="timeline-title">Timeline Item Title</div>
+        <div class="timeline-desc">Timeline item description.</div>
+      </div>
+    </div>
+
+    Context Grid:
+    <div class="context-grid reveal">
+      <div class="context-card">
+        <div class="context-icon"><svg>...</svg></div>
+        <div class="context-label">Label</div>
+        <div class="context-title">Context Title</div>
+        <div class="context-desc">Description text.</div>
+        <div class="context-example">
+          <strong>"Example"</strong> — explanation
+        </div>
+      </div>
+    </div>
+
+    Evolution Diagram:
+    <div class="evolution reveal">
+      <div class="evo-box">
+        <div class="evo-label">BEFORE</div>
+        <div class="evo-text">State A</div>
+      </div>
+      <div class="evo-arrow">→</div>
+      <div class="evo-box">
+        <div class="evo-label">AFTER</div>
+        <div class="evo-text evo-text--active">State B</div>
+      </div>
+    </div>
+
+    Discussion Q-Grid:
+    <div class="q-grid reveal">
+      <div class="q-card">
+        <div class="q-tag">Tag</div>
+        <div class="q-text">Question or discussion point?</div>
+      </div>
+    </div>
+
+    Badges:
+    <span class="engine-badge">BADGE TEXT</span>
+  </div>
+</section>
+-->
+
+    <!-- ═══════ FOOTER ═══════ -->
+    <!--
+<footer class="footer">
+  <div class="container">
+    <div class="footer-brand"><strong>b3rys</strong> — Page Title</div>
+    <div class="footer-date">2025</div>
+  </div>
+</footer>
+-->
+
+    <script>
+      // Intersection Observer for reveal animations
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              entry.target.classList.add('visible');
+            }
+          });
+        },
+        { threshold: 0.1, rootMargin: '0px 0px -40px 0px' },
+      );
+
+      document.querySelectorAll('.reveal').forEach((el) => observer.observe(el));
+    </script>
+  </body>
+</html>

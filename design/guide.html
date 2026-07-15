@@ -1,0 +1,858 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Design Guide — b3rys</title>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Geist+Mono:wght@300;400;500&family=Noto+Sans+KR:wght@300;400;500;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Design System -->
+    <link rel="stylesheet" href="tokens.css" />
+    <link rel="stylesheet" href="base.css" />
+    <link rel="stylesheet" href="components.css" />
+
+    <style>
+      /* Guide-specific styles */
+      .guide-section {
+        padding: 80px 0;
+        border-top: 1px solid var(--border);
+      }
+      .guide-section:first-of-type {
+        border-top: none;
+      }
+      .guide-label {
+        font-family: var(--mono);
+        font-size: 11px;
+        font-weight: 300;
+        color: var(--green);
+        letter-spacing: 0.2em;
+        margin-bottom: 12px;
+        opacity: 0.7;
+      }
+      .guide-heading {
+        font-family: var(--heading);
+        font-size: clamp(28px, 4vw, 36px);
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 40px;
+      }
+      .swatch-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+        gap: 12px;
+        margin-bottom: 40px;
+      }
+      .swatch {
+        border-radius: var(--radius-md);
+        overflow: hidden;
+        border: 1px solid var(--border);
+      }
+      .swatch-color {
+        height: 80px;
+      }
+      .swatch-info {
+        padding: 10px 12px;
+        background: var(--bg-card);
+      }
+      .swatch-name {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--text-primary);
+        margin-bottom: 2px;
+      }
+      .swatch-value {
+        font-family: var(--mono);
+        font-size: 10px;
+        color: var(--text-muted);
+      }
+      .type-sample {
+        margin-bottom: 24px;
+      }
+      .type-meta {
+        font-family: var(--mono);
+        font-size: 10px;
+        color: var(--text-muted);
+        margin-top: 4px;
+      }
+      .spacing-row {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 12px;
+      }
+      .spacing-box {
+        background: var(--green-dim);
+        border: 1px solid var(--border-accent);
+        border-radius: 2px;
+        height: 24px;
+        flex-shrink: 0;
+      }
+      .spacing-label {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--text-secondary);
+        white-space: nowrap;
+      }
+      .radius-row {
+        display: flex;
+        gap: 24px;
+        align-items: end;
+        margin-bottom: 40px;
+      }
+      .radius-demo {
+        text-align: center;
+      }
+      .radius-box {
+        width: 64px;
+        height: 64px;
+        background: var(--bg-card);
+        border: 1px solid var(--border-accent);
+        margin-bottom: 8px;
+      }
+      .radius-name {
+        font-family: var(--mono);
+        font-size: 10px;
+        color: var(--text-muted);
+      }
+      .code-block {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        padding: 16px 20px;
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--text-secondary);
+        line-height: 1.7;
+        overflow-x: auto;
+        margin-top: 16px;
+        margin-bottom: 32px;
+      }
+      .component-demo {
+        margin-bottom: 48px;
+      }
+      .component-demo-title {
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--green);
+        letter-spacing: 0.1em;
+        margin-bottom: 16px;
+        opacity: 0.8;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid-bg"></div>
+
+    <!-- ═══════ HEADER ═══════ -->
+    <section class="hero" style="min-height: auto; padding: 120px 0 60px">
+      <div class="container">
+        <div class="hero-label"><span>b3rys · Design System</span></div>
+        <h1 class="hero-title" style="font-size: clamp(36px, 5vw, 52px)">Design Guide</h1>
+        <p class="hero-desc">
+          토큰, 타이포그래피, 컴포넌트를 한눈에 확인할 수 있는 가이드 페이지.
+          <strong>tokens.css</strong> + <strong>base.css</strong> +
+          <strong>components.css</strong>로 구성됩니다.
+        </p>
+      </div>
+    </section>
+
+    <!-- ═══════ COLORS ═══════ -->
+    <div class="guide-section">
+      <div class="container">
+        <div class="guide-label">01 — COLORS</div>
+        <h2 class="guide-heading">Color Palette</h2>
+
+        <div class="component-demo-title">Backgrounds</div>
+        <div class="swatch-grid">
+          <div class="swatch">
+            <div class="swatch-color" style="background: var(--bg-deep)"></div>
+            <div class="swatch-info">
+              <div class="swatch-name">--bg-deep</div>
+              <div class="swatch-value">#080b10</div>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color" style="background: var(--bg-primary)"></div>
+            <div class="swatch-info">
+              <div class="swatch-name">--bg-primary</div>
+              <div class="swatch-value">#0d1117</div>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color" style="background: var(--bg-card)"></div>
+            <div class="swatch-info">
+              <div class="swatch-name">--bg-card</div>
+              <div class="swatch-value">#111820</div>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color" style="background: var(--bg-card-hover)"></div>
+            <div class="swatch-info">
+              <div class="swatch-name">--bg-card-hover</div>
+              <div class="swatch-value">#151d27</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="component-demo-title">Borders</div>
+        <div class="swatch-grid">
+          <div class="swatch">
+            <div class="swatch-color" style="background: var(--border)"></div>
+            <div class="swatch-info">
+              <div class="swatch-name">--border</div>
+              <div class="swatch-value">#1e2a38</div>
+            </div>
+          </div>
+          <div class="swatch">
+            <div
+              class="swatch-color"
+              style="background: rgba(126, 231, 135, 0.2); border: 1px solid var(--border)"
+            ></div>
+            <div class="swatch-info">
+              <div class="swatch-name">--border-accent</div>
+              <div class="swatch-value">rgba(126,231,135,0.2)</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="component-demo-title">Green (Brand Accent)</div>
+        <div class="swatch-grid">
+          <div class="swatch">
+            <div class="swatch-color" style="background: var(--green)"></div>
+            <div class="swatch-info">
+              <div class="swatch-name">--green</div>
+              <div class="swatch-value">#7ee787</div>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color" style="background: var(--green-bright)"></div>
+            <div class="swatch-info">
+              <div class="swatch-name">--green-bright</div>
+              <div class="swatch-value">#a5f3b4</div>
+            </div>
+          </div>
+          <div class="swatch">
+            <div
+              class="swatch-color"
+              style="background: var(--green-dim); border: 1px solid var(--border)"
+            ></div>
+            <div class="swatch-info">
+              <div class="swatch-name">--green-dim</div>
+              <div class="swatch-value">rgba(126,231,135,0.08)</div>
+            </div>
+          </div>
+          <div class="swatch">
+            <div
+              class="swatch-color"
+              style="background: var(--green-glow); border: 1px solid var(--border)"
+            ></div>
+            <div class="swatch-info">
+              <div class="swatch-name">--green-glow</div>
+              <div class="swatch-value">rgba(126,231,135,0.15)</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="component-demo-title">Text</div>
+        <div class="swatch-grid">
+          <div class="swatch">
+            <div class="swatch-color" style="background: var(--text-primary)"></div>
+            <div class="swatch-info">
+              <div class="swatch-name">--text-primary</div>
+              <div class="swatch-value">#e6edf3</div>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color" style="background: var(--text-secondary)"></div>
+            <div class="swatch-info">
+              <div class="swatch-name">--text-secondary</div>
+              <div class="swatch-value">#8b949e</div>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="swatch-color" style="background: var(--text-muted)"></div>
+            <div class="swatch-info">
+              <div class="swatch-name">--text-muted</div>
+              <div class="swatch-value">#484f58</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════ TYPOGRAPHY ═══════ -->
+    <div class="guide-section">
+      <div class="container">
+        <div class="guide-label">02 — TYPOGRAPHY</div>
+        <h2 class="guide-heading">Type Scale</h2>
+
+        <div class="type-sample">
+          <h1 style="margin-bottom: 0">Heading 1 — 대제목</h1>
+          <div class="type-meta">Outfit · clamp(48px, 7vw, 72px) · 600 · -0.03em</div>
+        </div>
+        <div class="type-sample">
+          <h2 style="margin-bottom: 0">Heading 2 — 섹션 제목</h2>
+          <div class="type-meta">Outfit · clamp(32px, 5vw, 44px) · 600 · -0.02em</div>
+        </div>
+        <div class="type-sample">
+          <h3 style="margin-bottom: 0">Heading 3 — 카드 제목</h3>
+          <div class="type-meta">Outfit · 22px · 500 · -0.02em</div>
+        </div>
+        <div class="type-sample">
+          <h4 style="margin-bottom: 0">Heading 4 — 소제목</h4>
+          <div class="type-meta">Outfit · 17px · 500 · -0.02em</div>
+        </div>
+        <div class="type-sample">
+          <p style="margin-bottom: 0">
+            Body text — 본문 텍스트입니다. Noto Sans KR 폰트를 사용하며, 300~400 weight으로 읽기
+            좋은 간격을 유지합니다.
+          </p>
+          <div class="type-meta">Noto Sans KR · 15px · 300 · 1.7 line-height</div>
+        </div>
+        <div class="type-sample">
+          <p
+            style="
+              margin-bottom: 0;
+              font-family: var(--mono);
+              font-size: 13px;
+              color: var(--text-muted);
+            "
+          >
+            Mono text — const translate = (text) =&gt; api.call(text);
+          </p>
+          <div class="type-meta">Geist Mono · 13px · 400</div>
+        </div>
+
+        <div class="component-demo-title" style="margin-top: 40px">Font Families</div>
+        <!-- prettier-ignore -->
+        <pre class="code-block">--heading: 'Outfit', 'Noto Sans KR', -apple-system, sans-serif;
+--sans:    'Noto Sans KR', -apple-system, sans-serif;
+--mono:    'Geist Mono', monospace;</pre>
+      </div>
+    </div>
+
+    <!-- ═══════ SPACING & RADIUS ═══════ -->
+    <div class="guide-section">
+      <div class="container">
+        <div class="guide-label">03 — SPACING & RADIUS</div>
+        <h2 class="guide-heading">Spacing Scale</h2>
+
+        <div class="spacing-row">
+          <div class="spacing-box" style="width: 6px"></div>
+          <div class="spacing-label">--space-xs · 6px</div>
+        </div>
+        <div class="spacing-row">
+          <div class="spacing-box" style="width: 8px"></div>
+          <div class="spacing-label">--space-sm · 8px</div>
+        </div>
+        <div class="spacing-row">
+          <div class="spacing-box" style="width: 16px"></div>
+          <div class="spacing-label">--space-md · 16px</div>
+        </div>
+        <div class="spacing-row">
+          <div class="spacing-box" style="width: 24px"></div>
+          <div class="spacing-label">--space-lg · 24px</div>
+        </div>
+        <div class="spacing-row">
+          <div class="spacing-box" style="width: 32px"></div>
+          <div class="spacing-label">--space-xl · 32px</div>
+        </div>
+        <div class="spacing-row">
+          <div class="spacing-box" style="width: 48px"></div>
+          <div class="spacing-label">--space-2xl · 48px</div>
+        </div>
+        <div class="spacing-row">
+          <div class="spacing-box" style="width: 56px"></div>
+          <div class="spacing-label">--space-3xl · 56px</div>
+        </div>
+        <div class="spacing-row">
+          <div class="spacing-box" style="width: 120px"></div>
+          <div class="spacing-label">--space-section · 120px</div>
+        </div>
+
+        <h2 class="guide-heading" style="margin-top: 56px">Border Radius</h2>
+
+        <div class="radius-row">
+          <div class="radius-demo">
+            <div class="radius-box" style="border-radius: var(--radius-sm)"></div>
+            <div class="radius-name">--radius-sm<br />4px</div>
+          </div>
+          <div class="radius-demo">
+            <div class="radius-box" style="border-radius: var(--radius-md)"></div>
+            <div class="radius-name">--radius-md<br />8px</div>
+          </div>
+          <div class="radius-demo">
+            <div class="radius-box" style="border-radius: var(--radius-lg)"></div>
+            <div class="radius-name">--radius-lg<br />10px</div>
+          </div>
+          <div class="radius-demo">
+            <div class="radius-box" style="border-radius: var(--radius-xl)"></div>
+            <div class="radius-name">--radius-xl<br />12px</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════ COMPONENTS ═══════ -->
+    <div class="guide-section">
+      <div class="container">
+        <div class="guide-label">04 — COMPONENTS</div>
+        <h2 class="guide-heading">Live Examples</h2>
+
+        <!-- Card Grid (2 col) -->
+        <div class="component-demo">
+          <div class="component-demo-title">CARD GRID — 2 Columns</div>
+          <div class="card-grid">
+            <div class="card card--highlight">
+              <div class="card-icon">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M4 19.5v-15A2.5 2.5 0 016.5 2H20v20H6.5a2.5 2.5 0 010-5H20" />
+                </svg>
+              </div>
+              <div class="card-title">Highlighted Card</div>
+              <div class="card-text">Use .card--highlight for the green left border accent.</div>
+            </div>
+            <div class="card">
+              <div class="card-icon">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M16 12l-4-4-4 4M12 16V8" />
+                </svg>
+              </div>
+              <div class="card-title">Default Card</div>
+              <div class="card-text">Standard card with icon, title, and description text.</div>
+            </div>
+          </div>
+          <!-- prettier-ignore -->
+          <pre class="code-block">&lt;div class="card-grid"&gt;
+  &lt;div class="card card--highlight"&gt;
+    &lt;div class="card-icon"&gt;&lt;svg&gt;...&lt;/svg&gt;&lt;/div&gt;
+    &lt;div class="card-title"&gt;Title&lt;/div&gt;
+    &lt;div class="card-text"&gt;Description&lt;/div&gt;
+  &lt;/div&gt;
+  &lt;div class="card"&gt;...&lt;/div&gt;
+&lt;/div&gt;</pre>
+        </div>
+
+        <!-- Card Grid (3 col) -->
+        <div class="component-demo">
+          <div class="component-demo-title">CARD GRID — 3 Columns</div>
+          <div class="card-grid card-grid--three">
+            <div class="card">
+              <div class="card-icon">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <rect x="2" y="3" width="20" height="14" rx="2" />
+                  <path d="M8 21h8M12 17v4" />
+                </svg>
+              </div>
+              <div class="card-title">Column A</div>
+              <div class="card-text">Three-column layout for compact items.</div>
+            </div>
+            <div class="card">
+              <div class="card-icon">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <line x1="6" y1="3" x2="6" y2="15" />
+                  <circle cx="18" cy="6" r="3" />
+                  <circle cx="6" cy="18" r="3" />
+                  <path d="M18 9a9 9 0 01-9 9" />
+                </svg>
+              </div>
+              <div class="card-title">Column B</div>
+              <div class="card-text">Use .card-grid--three modifier for 3 columns.</div>
+            </div>
+            <div class="card">
+              <div class="card-icon">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M22 12h-6l-2 3h-4l-2-3H2" />
+                  <path
+                    d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"
+                  />
+                </svg>
+              </div>
+              <div class="card-title">Column C</div>
+              <div class="card-text">Collapses to 1 column on mobile.</div>
+            </div>
+          </div>
+          <!-- prettier-ignore -->
+          <pre class="code-block">&lt;div class="card-grid card-grid--three"&gt;
+  &lt;div class="card"&gt;...&lt;/div&gt;
+  &lt;div class="card"&gt;...&lt;/div&gt;
+  &lt;div class="card"&gt;...&lt;/div&gt;
+&lt;/div&gt;</pre>
+        </div>
+
+        <!-- Flywheel -->
+        <div class="component-demo">
+          <div class="component-demo-title">FLYWHEEL — Step Diagram</div>
+          <div class="flywheel">
+            <div class="flywheel-step">
+              <div class="flywheel-num">01</div>
+              <div class="flywheel-label">Input</div>
+              <div class="flywheel-desc">First step description</div>
+            </div>
+            <div class="flywheel-step">
+              <div class="flywheel-num">02</div>
+              <div class="flywheel-label">Process</div>
+              <div class="flywheel-desc">Second step description</div>
+            </div>
+            <div class="flywheel-step">
+              <div class="flywheel-num">03</div>
+              <div class="flywheel-label">Output</div>
+              <div class="flywheel-desc">Third step description</div>
+            </div>
+          </div>
+          <!-- prettier-ignore -->
+          <pre class="code-block">&lt;div class="flywheel"&gt;
+  &lt;div class="flywheel-step"&gt;
+    &lt;div class="flywheel-num"&gt;01&lt;/div&gt;
+    &lt;div class="flywheel-label"&gt;Step Name&lt;/div&gt;
+    &lt;div class="flywheel-desc"&gt;Description&lt;/div&gt;
+  &lt;/div&gt;
+  ...
+&lt;/div&gt;</pre>
+        </div>
+
+        <!-- Timeline -->
+        <div class="component-demo">
+          <div class="component-demo-title">TIMELINE</div>
+          <div class="timeline">
+            <div class="timeline-item">
+              <div class="timeline-phase">Phase 1 — Active</div>
+              <div class="timeline-title">First milestone (green dot)</div>
+              <div class="timeline-desc">
+                The first item shows a filled green dot with glow. Subsequent items show outlined
+                dots.
+              </div>
+            </div>
+            <div class="timeline-item">
+              <div class="timeline-phase">Phase 2 — Upcoming</div>
+              <div class="timeline-title">Second milestone</div>
+              <div class="timeline-desc">Standard timeline item with outlined dot.</div>
+            </div>
+            <div class="timeline-item">
+              <div class="timeline-phase">Phase 3 — Future</div>
+              <div class="timeline-title">Third milestone</div>
+              <div class="timeline-desc">
+                Timeline continues with the gradient line fading to border color.
+              </div>
+            </div>
+          </div>
+          <!-- prettier-ignore -->
+          <pre class="code-block">&lt;div class="timeline"&gt;
+  &lt;div class="timeline-item"&gt;
+    &lt;div class="timeline-phase"&gt;Phase 1 — Label&lt;/div&gt;
+    &lt;div class="timeline-title"&gt;Title&lt;/div&gt;
+    &lt;div class="timeline-desc"&gt;Description&lt;/div&gt;
+  &lt;/div&gt;
+  ...
+&lt;/div&gt;</pre>
+        </div>
+
+        <!-- Context Cards -->
+        <div class="component-demo">
+          <div class="component-demo-title">CONTEXT CARD</div>
+          <div class="context-grid">
+            <div class="context-card">
+              <div class="context-icon">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" />
+                  <circle cx="12" cy="10" r="3" />
+                </svg>
+              </div>
+              <div class="context-label">Category</div>
+              <div class="context-title">Context Title</div>
+              <div class="context-desc">
+                Rich card with icon, label, title, description, and optional example block.
+              </div>
+              <div class="context-example">
+                <strong>"Example input"</strong> — Explanation of the example
+              </div>
+            </div>
+            <div class="context-card">
+              <div class="context-icon">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z" />
+                  <path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z" />
+                </svg>
+              </div>
+              <div class="context-label">Another</div>
+              <div class="context-title">Second Card</div>
+              <div class="context-desc">
+                Cards have a green top accent line. The first card has full opacity, others are
+                dimmed.
+              </div>
+            </div>
+          </div>
+          <!-- prettier-ignore -->
+          <pre class="code-block">&lt;div class="context-grid"&gt;
+  &lt;div class="context-card"&gt;
+    &lt;div class="context-icon"&gt;&lt;svg&gt;...&lt;/svg&gt;&lt;/div&gt;
+    &lt;div class="context-label"&gt;Label&lt;/div&gt;
+    &lt;div class="context-title"&gt;Title&lt;/div&gt;
+    &lt;div class="context-desc"&gt;Description&lt;/div&gt;
+    &lt;div class="context-example"&gt;
+      &lt;strong&gt;"Example"&lt;/strong&gt; — explanation
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;</pre>
+        </div>
+
+        <!-- Evolution -->
+        <div class="component-demo">
+          <div class="component-demo-title">EVOLUTION DIAGRAM</div>
+          <div class="evolution">
+            <div class="evo-box">
+              <div class="evo-label">BEFORE</div>
+              <div class="evo-text">State A</div>
+            </div>
+            <div class="evo-arrow">&rarr;</div>
+            <div class="evo-box">
+              <div class="evo-label">MIDDLE</div>
+              <div class="evo-text">State B</div>
+            </div>
+            <div class="evo-arrow">&rarr;</div>
+            <div class="evo-box">
+              <div class="evo-label">AFTER</div>
+              <div class="evo-text evo-text--active">State C</div>
+            </div>
+          </div>
+          <!-- prettier-ignore -->
+          <pre class="code-block">&lt;div class="evolution"&gt;
+  &lt;div class="evo-box"&gt;
+    &lt;div class="evo-label"&gt;LABEL&lt;/div&gt;
+    &lt;div class="evo-text"&gt;Text&lt;/div&gt;
+  &lt;/div&gt;
+  &lt;div class="evo-arrow"&gt;&amp;rarr;&lt;/div&gt;
+  &lt;div class="evo-box"&gt;
+    &lt;div class="evo-label"&gt;LABEL&lt;/div&gt;
+    &lt;div class="evo-text evo-text--active"&gt;Active&lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;</pre>
+        </div>
+
+        <!-- Q-Grid -->
+        <div class="component-demo">
+          <div class="component-demo-title">Q-GRID — Discussion Cards</div>
+          <div class="q-grid">
+            <div class="q-card">
+              <div class="q-tag">Topic A</div>
+              <div class="q-text">
+                Question or discussion point goes here. Cards have subtle border hover effect.
+              </div>
+            </div>
+            <div class="q-card">
+              <div class="q-tag">Topic B</div>
+              <div class="q-text">
+                Use for open questions, brainstorming items, or discussion prompts.
+              </div>
+            </div>
+          </div>
+          <!-- prettier-ignore -->
+          <pre class="code-block">&lt;div class="q-grid"&gt;
+  &lt;div class="q-card"&gt;
+    &lt;div class="q-tag"&gt;Tag&lt;/div&gt;
+    &lt;div class="q-text"&gt;Question text&lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;</pre>
+        </div>
+
+        <!-- Section -->
+        <div class="component-demo">
+          <div class="component-demo-title">SECTION HEADER</div>
+          <div
+            style="
+              padding: 32px;
+              background: var(--bg-card);
+              border-radius: var(--radius-xl);
+              border: 1px solid var(--border);
+            "
+          >
+            <div class="section-number">01 — SECTION LABEL</div>
+            <h2 class="section-title" style="font-size: 32px">Section Title</h2>
+            <p class="section-subtitle" style="margin-bottom: 0">
+              Subtitle describing the section content.
+            </p>
+          </div>
+          <!-- prettier-ignore -->
+          <pre class="code-block">&lt;div class="section-number"&gt;01 — LABEL&lt;/div&gt;
+&lt;h2 class="section-title"&gt;Title&lt;/h2&gt;
+&lt;p class="section-subtitle"&gt;Subtitle&lt;/p&gt;</pre>
+        </div>
+
+        <!-- Engine Badge -->
+        <div class="component-demo">
+          <div class="component-demo-title">ENGINE BADGE &amp; ICON BUTTON</div>
+          <div style="display: flex; align-items: center; gap: 16px">
+            <span class="engine-badge">GEMINI</span>
+            <span class="engine-badge">GPT-4o</span>
+            <span class="engine-badge">CLAUDE</span>
+            <button class="btn-icon-sm">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+            </button>
+          </div>
+          <!-- prettier-ignore -->
+          <pre class="code-block">&lt;span class="engine-badge"&gt;LABEL&lt;/span&gt;
+
+&lt;button class="btn-icon-sm"&gt;
+  &lt;svg&gt;...&lt;/svg&gt;
+&lt;/button&gt;</pre>
+        </div>
+
+        <!-- Footer -->
+        <div class="component-demo">
+          <div class="component-demo-title">FOOTER</div>
+          <div
+            style="
+              padding: 24px;
+              background: var(--bg-card);
+              border-radius: var(--radius-xl);
+              border: 1px solid var(--border);
+              text-align: center;
+            "
+          >
+            <div class="footer-brand"><strong>b3rys</strong> — Page Title</div>
+            <div class="footer-date">2025 · Description</div>
+          </div>
+          <!-- prettier-ignore -->
+          <pre class="code-block">&lt;footer class="footer"&gt;
+  &lt;div class="container"&gt;
+    &lt;div class="footer-brand"&gt;&lt;strong&gt;b3rys&lt;/strong&gt; — Title&lt;/div&gt;
+    &lt;div class="footer-date"&gt;2025&lt;/div&gt;
+  &lt;/div&gt;
+&lt;/footer&gt;</pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════ ANIMATIONS ═══════ -->
+    <div class="guide-section">
+      <div class="container">
+        <div class="guide-label">05 — ANIMATIONS</div>
+        <h2 class="guide-heading">Reveal Animation</h2>
+
+        <p style="margin-bottom: 24px">
+          Add <code style="color: var(--green)">.reveal</code> to any element. It fades up into view
+          when scrolled into the viewport via IntersectionObserver.
+        </p>
+
+        <!-- prettier-ignore -->
+        <pre class="code-block">&lt;!-- HTML --&gt;
+&lt;div class="reveal"&gt;Content fades in on scroll&lt;/div&gt;
+
+&lt;!-- JS (add to page bottom) --&gt;
+&lt;script&gt;
+  const observer = new IntersectionObserver((entries) =&gt; {
+    entries.forEach(entry =&gt; {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+      }
+    });
+  }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+  document.querySelectorAll('.reveal').forEach(el =&gt; observer.observe(el));
+&lt;/script&gt;</pre>
+
+        <p style="margin-bottom: 24px">
+          Hero elements use <code style="color: var(--green)">@keyframes fadeUp</code> with
+          staggered delays.
+        </p>
+
+        <!-- prettier-ignore -->
+        <pre class="code-block">/* Staggered hero animations */
+.hero-label  { animation: fadeUp 0.8s ease 0.2s  forwards; }
+.hero-title  { animation: fadeUp 0.8s ease 0.35s forwards; }
+.hero-sub    { animation: fadeUp 0.8s ease 0.5s  forwards; }
+.hero-desc   { animation: fadeUp 0.8s ease 0.65s forwards; }
+.hero-scroll { animation: fadeUp 0.8s ease 1s    forwards; }</pre>
+      </div>
+    </div>
+
+    <!-- ═══════ FOOTER ═══════ -->
+    <footer class="footer">
+      <div class="container">
+        <div class="footer-brand"><strong>b3rys</strong> — Design System Guide</div>
+        <div class="footer-date">2025</div>
+      </div>
+    </footer>
+
+    <script>
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              entry.target.classList.add('visible');
+            }
+          });
+        },
+        { threshold: 0.1, rootMargin: '0px 0px -40px 0px' },
+      );
+
+      document.querySelectorAll('.reveal').forEach((el) => observer.observe(el));
+    </script>
+  </body>
+</html>

@@ -1,0 +1,118 @@
+<!-- Fixture: github-pr
+     Source: Synthetic (based on GitHub PR page structure)
+     Purpose: Comment/review detection -->
+<div class="pull-request-page">
+  <div class="gh-header">
+    <h1 class="gh-header-title">
+      <span class="js-issue-title"
+        >Implement streaming response handler for real-time data processing</span
+      >
+      <span class="gh-header-number">#142</span>
+    </h1>
+    <div class="gh-header-meta">
+      <span class="State State--open">Open</span>
+      <span>opened 3 days ago by <a href="/user">developer123</a></span>
+    </div>
+  </div>
+
+  <div class="pr-description">
+    <div class="comment-body markdown-body">
+      <p>
+        This pull request adds support for streaming responses in the API layer. The implementation
+        uses server-sent events to deliver real-time updates to connected clients.
+      </p>
+
+      <h3>Changes</h3>
+
+      <ul>
+        <li>Added StreamHandler class for managing concurrent connections</li>
+        <li>Implemented backpressure mechanism to prevent memory overflow</li>
+        <li>Added comprehensive test coverage for edge cases</li>
+        <li>Updated documentation with streaming examples</li>
+      </ul>
+
+      <h3>Testing</h3>
+
+      <p>
+        All existing tests pass. Added fifteen new unit tests and three integration tests covering
+        the streaming functionality.
+      </p>
+
+      <pre><code>npm run test -- --coverage
+All 89 tests passing
+Coverage: 94.2%</code></pre>
+    </div>
+  </div>
+
+  <div class="timeline">
+    <div class="timeline-comment">
+      <div class="comment-header"><a href="/reviewer1">reviewer1</a> commented 2 days ago</div>
+      <div class="comment-body markdown-body">
+        <p>
+          Great work on this implementation. The backpressure mechanism looks solid. A few comments
+          below on the error handling approach.
+        </p>
+      </div>
+    </div>
+
+    <div class="timeline-comment review-comment">
+      <div class="comment-header"><a href="/reviewer1">reviewer1</a> left a review comment</div>
+      <div class="comment-body markdown-body">
+        <p>
+          Consider using a more explicit error recovery strategy here. The current approach might
+          silently swallow connection errors that the caller needs to know about for proper cleanup.
+        </p>
+      </div>
+    </div>
+
+    <div class="timeline-comment">
+      <div class="comment-header"><a href="/developer123">developer123</a> commented 1 day ago</div>
+      <div class="comment-body markdown-body">
+        <p>
+          Thanks for the feedback. I have updated the error handling to propagate connection errors
+          through the event emitter pattern. This allows callers to register error handlers while
+          maintaining backward compatibility.
+        </p>
+        <p>
+          The updated implementation also includes automatic retry logic with exponential backoff
+          for transient network failures.
+        </p>
+      </div>
+    </div>
+
+    <div class="timeline-comment">
+      <div class="comment-header"><a href="/reviewer2">reviewer2</a> commented 12 hours ago</div>
+      <div class="comment-body markdown-body">
+        <p>
+          Looks good to me. The retry logic is a nice addition. One minor suggestion would be to
+          make the maximum retry count configurable through the options object rather than
+          hardcoding it.
+        </p>
+      </div>
+    </div>
+
+    <div class="timeline-comment">
+      <div class="comment-header"><a href="/bot">ci-bot</a> commented 6 hours ago</div>
+      <div class="comment-body">
+        <div class="ci-status">
+          <span class="status-check passed">Build passed</span>
+          <span class="status-check passed">Tests passed (89/89)</span>
+          <span class="status-check passed">Coverage: 94.2%</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pr-sidebar">
+    <div class="sidebar-section">
+      <h3>Reviewers</h3>
+      <div><a href="/reviewer1">reviewer1</a> - Approved</div>
+      <div><a href="/reviewer2">reviewer2</a> - Commented</div>
+    </div>
+    <div class="sidebar-section">
+      <h3>Labels</h3>
+      <span class="label">enhancement</span>
+      <span class="label">api</span>
+    </div>
+  </div>
+</div>

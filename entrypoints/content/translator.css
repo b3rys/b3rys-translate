@@ -1,0 +1,76 @@
+.b3rys-translation {
+  display: block;
+  color: inherit;
+  font-family: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+  margin-top: 0.6em;
+  margin-bottom: 0.8em;
+  padding: 0;
+  border: none;
+  background: none;
+  opacity: 1;
+  transition: opacity 0.3s ease;
+}
+
+.b3rys-translation-inline {
+  color: inherit;
+  font-family: inherit;
+  font-weight: inherit;
+  margin-left: 0.5em;
+  opacity: 1;
+  transition: opacity 0.3s ease;
+}
+
+.b3rys-loading {
+  display: inline-block;
+  width: 0.75em;
+  height: 0.75em;
+  margin-left: 0.4em;
+  border: 1.5px solid rgba(156, 163, 175, 0.3);
+  border-top-color: #6b7280;
+  border-radius: 50%;
+  vertical-align: middle;
+  animation: b3rys-spin 0.7s linear infinite;
+}
+
+@keyframes b3rys-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.b3rys-error {
+  display: block;
+  color: #ef4444;
+  font-size: 0.8em;
+  padding: 4px 10px;
+  margin-top: 4px;
+  border-left: 1.5px solid #ef4444;
+  background: rgba(239, 68, 68, 0.05);
+  border-radius: 0 6px 6px 0;
+}
+
+/* All translation elements must never be scroll anchors.
+   This lets browser scroll anchoring keep real content stable
+   when translations are shown/hidden/injected. */
+[data-b3rys-translated] {
+  overflow-anchor: none !important;
+}
+
+/* Hide mode: CSS-hide all translations in a single layout pass (scroll-safe) */
+body.b3rys-hiding-translations [data-b3rys-translated] {
+  display: none !important;
+}
+
+/* Replace mode: hide originals, remove translation margins */
+body.b3rys-replace-mode [data-b3rys-original] {
+  display: none;
+}
+body.b3rys-replace-mode .b3rys-translation {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+body.b3rys-replace-mode .b3rys-translation-inline {
+  margin-left: 0;
+}

@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=360" />
+    <link rel="stylesheet" href="./style.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Outfit:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <title>b3rys translate</title>
+  </head>
+  <body>
+    <div class="popup">
+      <div class="grain"></div>
+
+      <header class="header">
+        <div class="logo-mark">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <rect x="1" y="1" width="8" height="8" rx="2" fill="#7ee787" opacity="0.9" />
+            <rect x="11" y="1" width="8" height="8" rx="2" fill="#7ee787" opacity="0.4" />
+            <rect x="1" y="11" width="8" height="8" rx="2" fill="#7ee787" opacity="0.4" />
+            <rect x="11" y="11" width="8" height="8" rx="2" fill="#7ee787" opacity="0.15" />
+          </svg>
+        </div>
+        <div class="title-group">
+          <h1 class="title">b3rys <span class="title-accent">translate</span></h1>
+          <span class="version">v0.5.0</span>
+        </div>
+      </header>
+
+      <div id="api-error-banner" class="error-banner" style="display: none">
+        <span id="api-error-message" class="error-banner-text"></span>
+        <button id="dismiss-error" class="error-banner-dismiss">&times;</button>
+      </div>
+
+      <div class="divider"></div>
+
+      <section class="section">
+        <label class="label" for="engine-select">
+          <span class="label-text">Engine</span>
+          <span
+            class="info-trigger"
+            id="engine-info"
+            tabindex="0"
+            role="button"
+            aria-label="엔진 비교 설명"
+          >
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.3" />
+              <path d="M8 7v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+              <circle cx="8" cy="4.75" r="0.9" fill="currentColor" />
+            </svg>
+            <span class="info-trigger-text">설명</span>
+            <span class="info-tooltip" id="engine-tooltip" role="tooltip"></span>
+          </span>
+        </label>
+        <!-- options populated from ENGINE catalog in main.ts -->
+        <select id="engine-select" class="select"></select>
+      </section>
+
+      <section class="section">
+        <label class="label" for="api-key">
+          <span class="label-text">API Key</span>
+          <span id="key-status" class="status"></span>
+        </label>
+        <div class="input-row">
+          <input
+            type="password"
+            id="api-key"
+            class="input"
+            placeholder="Gemini API key"
+            spellcheck="false"
+            autocomplete="off"
+          />
+          <button id="save-key" class="btn-save">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" class="btn-icon">
+              <path
+                d="M13.5 4.5L6.5 11.5L2.5 7.5"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </button>
+          <button id="delete-key" class="btn-delete">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" class="btn-icon">
+              <path
+                d="M2 4h12M5.333 4V2.667a1.333 1.333 0 011.334-1.334h2.666a1.333 1.333 0 011.334 1.334V4m2 0v9.333a1.333 1.333 0 01-1.334 1.334H4.667a1.333 1.333 0 01-1.334-1.334V4h9.334z"
+                stroke="currentColor"
+                stroke-width="1.3"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </button>
+        </div>
+      </section>
+
+      <section class="section">
+        <label class="label">
+          <span class="label-text">Translate to</span>
+        </label>
+        <select id="target-lang" class="select"></select>
+      </section>
+
+      <section class="section" style="margin-top: 10px">
+        <label class="label"><span class="label-text">Buttons</span></label>
+        <div class="toggle-pair">
+          <div class="toggle-row toggle-compact">
+            <div class="toggle-info">
+              <span class="label-text">Floating</span>
+              <span id="fab-status" class="toggle-status-text">Visible</span>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="fab-toggle" checked />
+              <span class="toggle-track">
+                <span class="toggle-thumb"></span>
+              </span>
+            </label>
+          </div>
+          <div class="toggle-row toggle-compact">
+            <div class="toggle-info">
+              <span class="label-text">YouTube</span>
+              <span id="yt-btn-status" class="toggle-status-text">Visible</span>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="yt-btn-toggle" checked />
+              <span class="toggle-track">
+                <span class="toggle-thumb"></span>
+              </span>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <!-- Cost Section -->
+      <section class="section">
+        <label class="label"><span class="label-text">Cost</span></label>
+        <div class="cost-row" id="cost-row">
+          <div class="cost-gauge" id="cost-gauge"></div>
+          <div class="cost-inline">
+            <span id="total-cost" class="cost-value">$0.0000</span>
+            <span class="cost-sep">/</span>
+            <div class="limit-input-inline">
+              <span class="limit-prefix">$</span>
+              <input
+                type="number"
+                id="cost-limit"
+                class="input-limit-inline"
+                placeholder="--"
+                step="0.01"
+                min="0"
+              />
+            </div>
+            <span id="limit-status" class="limit-status"></span>
+          </div>
+          <div class="cost-actions">
+            <button id="cost-detail-toggle" class="btn-icon-sm" title="상세보기">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <path
+                  d="M4 6l4 4 4-4"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </button>
+            <button id="cost-reset" class="btn-icon-sm btn-icon-danger" title="초기화">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <path
+                  d="M2 8a6 6 0 0111.46-2.46M14 8a6 6 0 01-11.46 2.46"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                />
+                <path
+                  d="M14 2v4h-4M2 14v-4h4"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Collapsible details -->
+        <div id="cost-details" class="cost-details" style="display: none">
+          <table class="cost-table">
+            <thead>
+              <tr>
+                <th>Engine</th>
+                <th>Usage</th>
+                <th>Cost</th>
+              </tr>
+            </thead>
+            <tbody id="cost-table-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <div class="divider"></div>
+
+      <!-- Cache Section -->
+      <section class="section">
+        <div class="cache-row">
+          <div class="cache-info">
+            <span class="label-text">번역 캐시</span>
+            <span class="cache-hint">초기화 시 모든 번역이 다시 요청됩니다</span>
+          </div>
+          <button id="cache-clear" class="btn-cache-clear">초기화</button>
+        </div>
+        <span id="cache-status" class="cache-status"></span>
+      </section>
+
+      <div class="divider"></div>
+
+      <footer class="footer">
+        <div class="engine-badge">
+          <span id="badge-direction" class="badge-direction">EN → KO</span>
+          <span class="badge-separator">·</span>
+          <a id="badge-link" class="badge-link" href="#" target="_blank">
+            <span class="badge-model">Gemini 3.1 Flash Lite</span>
+          </a>
+        </div>
+      </footer>
+    </div>
+
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

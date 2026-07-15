@@ -1,0 +1,13 @@
+{
+  "name": "b3rys",
+  "owner": {
+    "name": "b3rys"
+  },
+  "plugins": [
+    {
+      "name": "b3",
+      "source": "./",
+      "description": "Install and use the b3rys translate bilingual translation Chrome extension from Claude Code. Provides /b3:translate."
+    }
+  ]
+}
