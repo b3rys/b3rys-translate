@@ -1,0 +1,273 @@
+:host {
+  all: initial;
+}
+
+.b3rys-wrap {
+  position: fixed;
+  right: -14px;
+  top: 75%;
+  transform: translateY(-50%);
+  z-index: 2147483647;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  transition: right 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.b3rys-wrap:hover {
+  right: 4px;
+}
+
+/* Close button */
+.b3rys-close {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(60, 60, 60, 0.85);
+  color: #888;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  opacity: 0;
+  transition:
+    opacity 0.15s ease,
+    background 0.15s ease;
+  pointer-events: none;
+}
+
+.b3rys-wrap:hover .b3rys-close {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.b3rys-close:hover {
+  background: rgba(248, 81, 73, 0.7);
+  color: #fff;
+}
+
+.b3rys-close svg {
+  width: 8px;
+  height: 8px;
+}
+
+/* Main FAB */
+.b3rys-fab {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid rgba(126, 231, 135, 0.5);
+  background: rgba(13, 17, 23, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.04);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+  -webkit-user-select: none;
+  opacity: 0.7;
+}
+
+.b3rys-fab:hover {
+  opacity: 1;
+  border-color: rgba(126, 231, 135, 0.4);
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.4),
+    0 0 20px rgba(126, 231, 135, 0.08);
+  transform: scale(1.06);
+}
+
+.b3rys-fab:active {
+  transform: scale(0.95);
+}
+
+/* Icon states */
+.b3rys-fab svg.icon {
+  width: 14px;
+  height: 14px;
+  transition: opacity 0.2s ease;
+}
+
+.b3rys-fab .icon-translate {
+  color: #7ee787;
+}
+.b3rys-fab .icon-loading {
+  color: #7ee787;
+  animation: spin 1s linear infinite;
+}
+.b3rys-fab .icon-done {
+  color: #7ee787;
+}
+.b3rys-fab .icon-error {
+  color: #f85149;
+}
+
+.b3rys-fab .icon {
+  display: none;
+}
+.b3rys-fab[data-state='idle'] .icon-translate {
+  display: block;
+}
+.b3rys-fab[data-state='loading'] .icon-loading {
+  display: block;
+}
+.b3rys-fab[data-state='done'] .icon-done {
+  display: block;
+}
+.b3rys-fab[data-state='error'] .icon-error {
+  display: block;
+}
+
+/* Usage gauge */
+.b3rys-usage-gauge {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 0%;
+  background: #7ee787;
+  border-radius: 0 0 7px 7px;
+  opacity: 0.55;
+  transition:
+    height 0.5s ease,
+    background-color 0.5s ease;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Progress ring */
+.b3rys-progress {
+  position: absolute;
+  inset: -3px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.b3rys-fab[data-state='loading'] .b3rys-progress {
+  opacity: 1;
+}
+
+.b3rys-progress circle {
+  fill: none;
+  stroke: #7ee787;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-dasharray: 125;
+  stroke-dashoffset: 125;
+  transform: rotate(-90deg);
+  transform-origin: center;
+  transition: stroke-dashoffset 0.3s ease;
+}
+
+/* Mode toggle button */
+.b3rys-mode-toggle {
+  height: 16px;
+  padding: 0 5px;
+  border-radius: 8px;
+  border: 1px solid rgba(126, 231, 135, 0.35);
+  background: rgba(13, 17, 23, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: #7ee787;
+  font-family: -apple-system, 'Apple SD Gothic Neo', BlinkMacSystemFont, sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 14px;
+  white-space: nowrap;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 0.15s ease,
+    background 0.15s ease,
+    border-color 0.15s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+
+.b3rys-wrap:hover .b3rys-mode-toggle {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.b3rys-mode-toggle:hover {
+  background: rgba(126, 231, 135, 0.15);
+  border-color: rgba(126, 231, 135, 0.6);
+}
+
+.b3rys-mode-toggle:active {
+  transform: scale(0.93);
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.b3rys-wrap {
+  animation: fadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* Toast — small text next to FAB */
+.b3rys-toast {
+  position: absolute;
+  right: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: rgba(13, 17, 23, 0.95);
+  border: 1px solid rgba(126, 231, 135, 0.3);
+  color: #7ee787;
+  font:
+    11px/1.4 -apple-system,
+    'Apple SD Gothic Neo',
+    BlinkMacSystemFont,
+    sans-serif;
+  white-space: nowrap;
+  pointer-events: none;
+  animation:
+    toastIn 0.2s ease,
+    toastOut 0.3s ease 2.5s forwards;
+}
+
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateY(-50%) translateX(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+  }
+}
+
+@keyframes toastOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}

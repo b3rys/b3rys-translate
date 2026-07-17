@@ -1,0 +1,132 @@
+<!-- Fixture: github-readme
+     Source: Synthetic (based on GitHub README rendering)
+     Purpose: Markdown rendering detection -->
+<div class="repository-content">
+  <div id="readme" class="Box md">
+    <article class="markdown-body entry-content" itemprop="text">
+      <h1>awesome-project</h1>
+
+      <p>
+        A high-performance library for building scalable web applications with TypeScript and modern
+        tooling.
+      </p>
+
+      <p>
+        <a href="https://npmjs.com/awesome-project"
+          ><img src="badge-npm.svg" alt="npm version"
+        /></a>
+        <a href="https://github.com/user/awesome-project/actions"
+          ><img src="badge-ci.svg" alt="CI"
+        /></a>
+      </p>
+
+      <h2>Features</h2>
+
+      <ul>
+        <li>Zero-config setup with sensible defaults for common use cases</li>
+        <li>Built-in TypeScript support with comprehensive type definitions</li>
+        <li>Hot module replacement for rapid development iteration cycles</li>
+        <li>Tree-shaking support for minimal production bundle sizes</li>
+        <li>Plugin architecture for extending core functionality</li>
+      </ul>
+
+      <h2>Installation</h2>
+
+      <pre><code class="language-bash">npm install awesome-project</code></pre>
+
+      <h2>Quick Start</h2>
+
+      <p>Create a new project with the following configuration to get started immediately.</p>
+
+      <pre><code class="language-typescript">import { createApp } from 'awesome-project';
+
+const app = createApp({
+  port: 3000,
+  middleware: ['cors', 'compression'],
+});
+
+app.get('/api/hello', (req, res) =&gt; {
+  res.json({ message: 'Hello World' });
+});
+
+app.listen();</code></pre>
+
+      <h2>Configuration</h2>
+
+      <p>
+        The library supports extensive configuration through a simple configuration object. All
+        options have sensible defaults, so you only need to specify what you want to change.
+      </p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Option</th>
+            <th>Type</th>
+            <th>Default</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>port</td>
+            <td>number</td>
+            <td>3000</td>
+            <td>Server listening port</td>
+          </tr>
+          <tr>
+            <td>host</td>
+            <td>string</td>
+            <td>localhost</td>
+            <td>Server hostname</td>
+          </tr>
+          <tr>
+            <td>middleware</td>
+            <td>string[]</td>
+            <td>[]</td>
+            <td>Built-in middleware to enable</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>API Reference</h2>
+
+      <h3>createApp(options)</h3>
+
+      <p>
+        Creates a new application instance with the specified configuration options. Returns an
+        application object with methods for defining routes and middleware.
+      </p>
+
+      <h3>app.get(path, handler)</h3>
+
+      <p>
+        Registers a GET route handler for the specified path. The handler receives request and
+        response objects following standard conventions.
+      </p>
+
+      <h2>Contributing</h2>
+
+      <p>
+        We welcome contributions from the community. Please read our contributing guidelines before
+        submitting a pull request to ensure a smooth review process.
+      </p>
+
+      <h2>License</h2>
+
+      <p>MIT License. See <a href="LICENSE">LICENSE</a> for details.</p>
+    </article>
+  </div>
+</div>
+
+<nav class="repository-sidebar" aria-label="Repository sidebar">
+  <div class="about-section">
+    <h2>About</h2>
+    <p>A high-performance TypeScript web framework</p>
+  </div>
+  <div class="topics">
+    <a href="/topics/typescript">typescript</a>
+    <a href="/topics/web-framework">web-framework</a>
+    <a href="/topics/nodejs">nodejs</a>
+  </div>
+</nav>

@@ -1,0 +1,50 @@
+{
+  "name": "b3rys-translate",
+  "version": "0.5.0",
+  "description": "Bilingual translation Chrome extension — original text with translation below, plus YouTube dual subtitles",
+  "type": "module",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/b3rys/b3rys-translate#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/b3rys/b3rys-translate.git"
+  },
+  "bugs": {
+    "url": "https://github.com/b3rys/b3rys-translate/issues"
+  },
+  "scripts": {
+    "dev": "wxt",
+    "build": "wxt build",
+    "zip": "wxt zip",
+    "test": "vitest",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.2",
+    "@types/chrome": "^0.1.36",
+    "eslint": "^9.39.2",
+    "eslint-config-prettier": "^10.1.8",
+    "happy-dom": "^20.4.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
+    "prettier": "^3.8.1",
+    "typescript": "^5.7.0",
+    "typescript-eslint": "^8.54.0",
+    "vitest": "^4.0.18",
+    "wxt": "^0.20.13"
+  },
+  "lint-staged": {
+    "*.{ts,js}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,css,html,md}": [
+      "prettier --write"
+    ]
+  }
+}

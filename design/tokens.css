@@ -1,0 +1,143 @@
+/* ═══════════════════════════════════════════════════════════
+   b3rys Design System — Tokens
+   CSS custom properties (color, typography, spacing, radius, transition)
+   ═══════════════════════════════════════════════════════════ */
+
+:root {
+  /* ─── Color: Backgrounds ─── */
+  --bg-deep: #0d0f12;
+  --bg-primary: #141618;
+  --bg-card: #1a1d21;
+  --bg-card-hover: #1f2328;
+  --bg-elevated: #24272c;
+  --bg-input: #1a1d21;
+  --bg-overlay: rgba(0, 0, 0, 0.5);
+
+  /* ─── Color: Borders ─── */
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.14);
+  --border-accent: rgba(126, 231, 135, 0.25);
+
+  /* ─── Color: Green (brand accent) ─── */
+  --green: #7ee787;
+  --green-dim: rgba(126, 231, 135, 0.1);
+  --green-glow: rgba(126, 231, 135, 0.15);
+  --green-bright: #a5f3b4;
+  --green-dark: #238636;
+  --green-btn: #2ea043;
+  --green-btn-hover: #3fb950;
+
+  /* ─── Color: Semantic ─── */
+  --color-success: #7ee787;
+  --color-warning: #f0b840;
+  --color-danger: #f85149;
+  --color-info: #58a6ff;
+
+  /* ─── Color: Text ─── */
+  --text-primary: #f0f3f6;
+  --text-secondary: #d4d9e0;
+  --text-muted: #9ba3ad;
+  --text-inverse: #000000;
+
+  /* ─── Typography: Font families ─── */
+  --heading: 'Outfit', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
+  --sans: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
+  --mono: 'Geist Mono', 'SF Mono', monospace;
+
+  /* ─── Typography: Sizes (Apple HIG aligned) ─── */
+  --text-xs: 11px;
+  --text-sm: 13px;
+  --text-base: 15px;
+  --text-md: 16px;
+  --text-lg: 18px;
+  --text-xl: 20px;
+  --text-2xl: 24px;
+  --text-3xl: 32px;
+
+  /* ─── Typography: Line heights ─── */
+  --leading-tight: 1.25;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.7;
+
+  /* ─── Spacing (8px base) ─── */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+  --space-2xl: 32px;
+  --space-3xl: 48px;
+  --space-4xl: 64px;
+  --space-section: 96px;
+  --space-section-mobile: 64px;
+
+  /* ─── Layout ─── */
+  --card-padding: 24px;
+  --container-padding: 0 32px;
+  --container-padding-mobile: 0 20px;
+  --container-max-width: 960px;
+  --sidebar-width: 260px;
+
+  /* ─── Border Radius ─── */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-full: 9999px;
+
+  /* ─── Shadows ─── */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.25);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.35);
+  --shadow-glow: 0 0 20px rgba(126, 231, 135, 0.15);
+
+  /* ─── Backdrop blur ─── */
+  --blur-sm: blur(8px);
+  --blur-md: blur(16px);
+  --blur-lg: blur(24px);
+
+  /* ─── Transitions ─── */
+  --transition-fast: all 0.15s ease;
+  --transition-base: all 0.25s ease;
+  --transition-reveal: all 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+  --easing-reveal: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/* ─── Light Theme Override ─── */
+[data-theme='light'] {
+  --bg-deep: #f5f5f7;
+  --bg-primary: #ffffff;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f9f9fb;
+  --bg-elevated: #ffffff;
+  --bg-input: #f0f0f2;
+  --bg-overlay: rgba(0, 0, 0, 0.3);
+
+  --border: rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.15);
+  --border-accent: rgba(52, 199, 89, 0.3);
+
+  --green: #28a745;
+  --green-dim: rgba(52, 199, 89, 0.08);
+  --green-glow: rgba(52, 199, 89, 0.12);
+  --green-bright: #34c759;
+  --green-dark: #1a7f37;
+  --green-btn: #1a7f37;
+  --green-btn-hover: #2ea043;
+
+  --color-success: #28a745;
+  --color-warning: #d29922;
+  --color-danger: #cf222e;
+  --color-info: #0969da;
+
+  --text-primary: #1d1d1f;
+  --text-secondary: #48484a;
+  --text-muted: #7c7c80;
+  --text-inverse: #ffffff;
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.12);
+  --shadow-glow: 0 0 20px rgba(52, 199, 89, 0.12);
+}

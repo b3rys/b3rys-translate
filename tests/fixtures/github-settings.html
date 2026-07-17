@@ -1,0 +1,126 @@
+<!-- GitHub repo settings page — typical Primer CSS structure -->
+
+<!-- Features section: checkboxes with labels -->
+<div class="features-container">
+  <!-- Wikis checkbox -->
+  <div class="form-checkbox">
+    <label>
+      <input type="checkbox" checked />
+      Wikis
+    </label>
+    <span class="note">Wikis host documentation for your repository.</span>
+  </div>
+
+  <!-- Sub-checkbox: Restrict editing -->
+  <div class="form-checkbox" style="margin-left: 24px">
+    <label>
+      <input type="checkbox" checked />
+      Restrict editing to users in teams with push access only
+    </label>
+  </div>
+
+  <!-- Issues checkbox -->
+  <div class="form-checkbox">
+    <label>
+      <input type="checkbox" checked />
+      Issues
+    </label>
+    <p class="note">
+      Issues integrate lightweight task tracking into your repository. Keep projects on track with
+      issue labels and milestones, and reference them in commit messages.
+    </p>
+  </div>
+
+  <!-- Blue info box with "Set up templates" button (flex layout) -->
+  <div
+    class="Box color-bg-subtle p-3"
+    style="
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 16px;
+      background: #ddf4ff;
+      border-radius: 6px;
+    "
+  >
+    <div style="flex: 1 1 auto">
+      <strong>Get organized with issue templates</strong>
+      <div class="text-small color-fg-muted">
+        Give contributors issue templates that help them cut through the noise and help them push
+        your project forward.
+      </div>
+    </div>
+    <a
+      class="btn btn-primary"
+      href="/settings/templates"
+      style="
+        display: inline-block;
+        padding: 5px 16px;
+        white-space: nowrap;
+        background-color: #1f883d;
+        color: #fff;
+        border-radius: 6px;
+        font-weight: 500;
+      "
+      >Set up templates</a
+    >
+  </div>
+
+  <!-- Allow forking -->
+  <div class="form-checkbox">
+    <label>
+      <input type="checkbox" />
+      Allow forking
+    </label>
+    <span class="note">If disabled, existing forks will be unaffected.</span>
+  </div>
+
+  <!-- Sponsorships -->
+  <div class="form-checkbox">
+    <label>
+      <input type="checkbox" />
+      Sponsorships
+    </label>
+    <span class="note">
+      Sponsorships help your community know how to financially support this repository.
+    </span>
+  </div>
+
+  <!-- Display Sponsor button (flex layout with button) -->
+  <div class="Box p-3" style="padding: 16px; border: 1px solid #d0d7de; border-radius: 6px">
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px">
+      <div>
+        <div>Display a "Sponsor" button</div>
+        <div class="text-small color-fg-muted">
+          Add links to GitHub Sponsors or third-party methods your repository accepts for financial
+          contributions to your project.
+        </div>
+      </div>
+      <a
+        class="btn btn-primary"
+        style="
+          display: inline-block;
+          padding: 5px 16px;
+          white-space: nowrap;
+          background-color: #1f883d;
+          color: #fff;
+          border-radius: 6px;
+          font-weight: 500;
+        "
+        >Set up sponsor button</a
+      >
+    </div>
+  </div>
+
+  <!-- Discussions -->
+  <div class="form-checkbox">
+    <label>
+      <input type="checkbox" />
+      Discussions
+    </label>
+    <span class="note">
+      Discussions is the space for your community to have conversations, ask questions and post
+      answers without opening issues.
+    </span>
+  </div>
+</div>

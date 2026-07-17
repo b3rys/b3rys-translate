@@ -1,0 +1,37 @@
+# Supabase
+.branches
+.temp
+
+# Environment (민감정보)
+.env
+.env.keys
+.env.local
+.env.*.local
+.env.production
+.env.development
+
+# Dependencies
+node_modules
+
+# Python (로컬 스크립트/벤치마크 도구용 venv)
+.venv
+__pycache__
+*.pyc
+
+# Build output / WXT
+dist
+.output
+.wxt
+
+# Packaged extension
+*.zip
+
+# OS / editor cruft
+.DS_Store
+.envrc
+
+# Internal dev tooling (public repo에서 제외 — 로컬 유지)
+.claude/skills/auto-fix-loop/
+.claude/agents/fix-engineer.md
+.claude/agents/qa-verifier.md
+.claude/agents/report-analyst.md

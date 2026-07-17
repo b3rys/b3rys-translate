@@ -1,0 +1,94 @@
+<!-- Fixture: substack-note-single
+     Source: https://substack.com/@rasbt/note/c-207892753
+     Purpose: Substack Notes single-note page detection + truncation test
+     NOTE: Synthetic — based on screenshot analysis of real page.
+           Replace with real DOM via capture-dom.js for accuracy. -->
+<div class="reader2-clamp-container">
+  <div class="reader2-post-container">
+    <!-- Profile header (should be skipped) -->
+    <div class="profile-hover-card-target">
+      <a href="/@rasbt"><img src="avatar.jpg" width="40" height="40" /></a>
+      <div class="pencraft-reset">
+        <a href="/@rasbt">Sebastian Raschka, PhD</a>
+        <span class="pencraft-reset">Jan 31</span>
+      </div>
+    </div>
+
+    <!-- Note body — <p> tags with text-overflow: ellipsis (Substack applies
+         this on containers but WITHOUT overflow: hidden, so text is NOT
+         actually truncated. Our detector must NOT apply truncation styles.) -->
+    <div class="body markup" style="text-overflow: ellipsis">
+      <p>
+        Ch 6 on reinforcement learning with verifiable rewards is now available. This chapter walks
+        through GRPO from scratch, including a minimal but complete training loop with all the fun
+        stuff: reward normalization, advantage estimation, etc.
+      </p>
+      <p>
+        And no worries, I'd say it is less complicated than it sounds. It is probably my favorite
+        chapter so far. (And with this, the first 363 pages of the book are now complete.)
+      </p>
+      <p>
+        On a little tangent: you probably saw the clawdbot / OpenClaw developments in recent days.
+        Essentially, it's a next-token predicting (reasoning) model combined with some looping,
+        tool-use, orchestration, and recursion. And it's fascinating how these ingredients add up to
+        something that is actually quite capable and quite autonomous (PS: I don't think clawdbot is
+        taking over the world; but it's an interesting case study of how far the LLM/reasoning model
+        can go if it is packaged up in a certain way.)
+      </p>
+      <p>
+        More broadly, what I am trying to say is that building methods from scratch helps us
+        understand and appreciate the tools we rely on every day. For instance, RL with verifiable
+        rewards is probably THE core ingredient of reasoning models and agent-style setups these
+        days.
+      </p>
+      <!-- Bug reproduction: author hit Enter after "I", creating two <p> elements -->
+      <p>I</p>
+      <p>
+        am currently working on the follow-up chapter with additional RLVR runs, more detailed
+        metrics and analyses of training dynamics, and extensions like policy ratio clipping and KL
+        regularization. (These were intentionally left out in chapter 6 to keep the initial GRPO
+        introduction simple, readable, and closer in spirit to REINFORCE.)
+      </p>
+      <p>
+        I also have a long list of around 15 GRPO-related algorithmic tweaks queued up to run and
+        analyze next. Fun times.
+      </p>
+      <p>Here is the early-access link: <a href="https://mng.bz/Nwr7">https://mng.bz/Nwr7</a></p>
+      <p>Happy weekend!</p>
+    </div>
+
+    <!-- Actions (should be skipped — short text) -->
+    <div class="post-actions">
+      <button>Like</button>
+      <button>Reply</button>
+      <button>Share</button>
+      <button>Restack</button>
+    </div>
+
+    <!-- Comments section -->
+    <div class="comments-section">
+      <div class="comment">
+        <div class="profile-hover-card-target">
+          <a href="/@user1">Commenter One</a>
+        </div>
+        <div class="body markup">
+          <p>
+            This looks amazing! Can't wait to read through the GRPO chapter. The from-scratch
+            approach really helps with understanding.
+          </p>
+        </div>
+      </div>
+      <div class="comment">
+        <div class="profile-hover-card-target">
+          <a href="/@user2">Commenter Two</a>
+        </div>
+        <div class="body markup">
+          <p>
+            Great work Sebastian. The training dynamics analysis section is exactly what I was
+            hoping for.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

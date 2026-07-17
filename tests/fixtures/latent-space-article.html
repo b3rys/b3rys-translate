@@ -1,0 +1,119 @@
+<!-- Fixture: latent-space-article
+     Source: Synthetic (based on latent.space blog structure)
+     Purpose: Phase 1 P/H1-H6 detection, code block exclusion -->
+<article class="post-content">
+  <h1>Understanding Transformer Architecture: A Deep Dive</h1>
+
+  <div class="post-meta">
+    <span>By Author Name</span>
+    <time datetime="2024-01-15">January 15, 2024</time>
+  </div>
+
+  <p>
+    The transformer architecture has fundamentally changed how we approach natural language
+    processing tasks. In this article, we explore the key innovations that make transformers so
+    effective at modeling sequential data.
+  </p>
+
+  <h2>Self-Attention Mechanism</h2>
+
+  <p>
+    At the heart of every transformer is the self-attention mechanism. Unlike recurrent neural
+    networks, self-attention allows the model to look at all positions in the input sequence
+    simultaneously, computing attention weights that determine how much focus to place on each
+    position.
+  </p>
+
+  <p>
+    The mathematical formulation involves computing queries, keys, and values from the input
+    embeddings, then using scaled dot-product attention to produce the output representation for
+    each position.
+  </p>
+
+  <pre><code class="language-python">
+import torch
+import torch.nn as nn
+
+class SelfAttention(nn.Module):
+    def __init__(self, embed_dim, num_heads):
+        super().__init__()
+        self.multihead_attn = nn.MultiheadAttention(embed_dim, num_heads)
+
+    def forward(self, x):
+        attn_output, attn_weights = self.multihead_attn(x, x, x)
+        return attn_output
+  </code></pre>
+
+  <h3>Multi-Head Attention</h3>
+
+  <p>
+    Rather than performing a single attention function, multi-head attention runs several attention
+    operations in parallel. Each head can learn to attend to different types of information, making
+    the representation richer and more expressive.
+  </p>
+
+  <blockquote>
+    <p>
+      Attention is all you need — the original paper demonstrated that a pure attention-based
+      architecture could outperform previous state-of-the-art models on machine translation tasks.
+    </p>
+  </blockquote>
+
+  <h2>Position Encoding</h2>
+
+  <p>
+    Since transformers process all positions in parallel, they need a way to encode the order of
+    tokens. Positional encodings are added to the input embeddings to give the model information
+    about the relative or absolute position of tokens in the sequence.
+  </p>
+
+  <p>
+    The original transformer used sinusoidal functions of different frequencies for positional
+    encoding. More recent approaches like RoPE (Rotary Position Embedding) have shown improved
+    performance on longer sequences.
+  </p>
+
+  <h3>Feed-Forward Networks</h3>
+
+  <p>
+    Each transformer layer also contains a position-wise feed-forward network. This consists of two
+    linear transformations with a ReLU activation in between, applied independently to each
+    position.
+  </p>
+
+  <code>FFN(x) = max(0, xW1 + b1)W2 + b2</code>
+
+  <h2>Training and Optimization</h2>
+
+  <p>
+    Training large transformer models requires careful optimization strategies. The learning rate
+    warmup schedule, gradient clipping, and proper initialization are all critical for stable
+    training of deep transformer architectures.
+  </p>
+
+  <p>
+    Recent advances in mixed-precision training and gradient checkpointing have made it possible to
+    train increasingly larger models on available hardware.
+  </p>
+
+  <h4>Key Takeaways</h4>
+
+  <ul>
+    <li>Self-attention enables parallel processing of sequential data with global context</li>
+    <li>Multi-head attention captures diverse relationships in the data</li>
+    <li>Positional encodings compensate for the lack of inherent sequence ordering</li>
+    <li>Modern training techniques have dramatically scaled transformer capabilities</li>
+  </ul>
+
+  <footer class="post-footer">
+    <p>Tags: machine-learning, transformers, nlp, deep-learning</p>
+  </footer>
+</article>
+
+<nav class="sidebar">
+  <ul>
+    <li><a href="/posts">All Posts</a></li>
+    <li><a href="/about">About</a></li>
+    <li><a href="/subscribe">Subscribe</a></li>
+  </ul>
+</nav>

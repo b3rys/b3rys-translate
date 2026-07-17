@@ -1,0 +1,275 @@
+:host {
+  all: initial;
+}
+
+/* Trigger button — small circle near selection */
+.b3rys-sel-trigger {
+  position: fixed;
+  z-index: 2147483647;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid rgba(126, 231, 135, 0.5);
+  background: rgba(13, 17, 23, 0.95);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.04);
+  transition:
+    background 0.15s ease,
+    transform 0.15s ease,
+    opacity 0.15s ease;
+  animation: selFadeIn 0.15s ease forwards;
+}
+
+.b3rys-sel-trigger:hover {
+  background: rgba(34, 197, 94, 0.15);
+  transform: scale(1.1);
+}
+
+.b3rys-sel-trigger:active {
+  transform: scale(0.95);
+}
+
+.b3rys-sel-trigger svg {
+  width: 12px;
+  height: 12px;
+  color: #7ee787;
+}
+
+/* Popup panel */
+.b3rys-sel-popup {
+  position: absolute;
+  z-index: 2147483647;
+  min-width: 300px;
+  max-width: 520px;
+  border-radius: 10px;
+  border: 1px solid #22c55e;
+  background: #1a1a1a;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.55);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 15px;
+  color: #e5e5e5;
+  overflow: hidden;
+  animation: selFadeIn 0.15s ease forwards;
+}
+
+.b3rys-sel-popup-inner {
+  padding: 16px;
+}
+
+/* Loading state */
+.b3rys-sel-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #9ca3af;
+}
+
+.b3rys-sel-spinner {
+  width: 16px;
+  height: 16px;
+  color: #7ee787;
+  animation: selSpin 1s linear infinite;
+}
+
+/* Result state */
+.b3rys-sel-result {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.b3rys-sel-text {
+  font-size: 15px;
+  line-height: 1.75;
+  word-break: break-word;
+  white-space: pre-wrap;
+  letter-spacing: -0.01em;
+}
+
+/* Sentence-separated display for long translations */
+.b3rys-sel-sentence {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.b3rys-sel-sentence:last-child {
+  margin-bottom: 0;
+}
+
+.b3rys-sel-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.b3rys-sel-copy {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: #7ee787;
+  transition: background 0.15s ease;
+  padding: 0;
+}
+
+.b3rys-sel-copy:hover {
+  background: rgba(126, 231, 135, 0.1);
+}
+
+.b3rys-sel-copy svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Compact popup (word mode) */
+.b3rys-sel-popup.compact {
+  min-width: 200px;
+  max-width: 380px;
+}
+
+.b3rys-sel-popup.compact .b3rys-sel-popup-inner {
+  padding: 10px;
+}
+
+/* Word mode header: "word — translation" + speak */
+.b3rys-sel-word-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+.b3rys-sel-speak {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: #9ca3af;
+  transition:
+    color 0.15s ease,
+    background 0.15s ease;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.b3rys-sel-speak:hover {
+  color: #7ee787;
+  background: rgba(126, 231, 135, 0.1);
+}
+
+.b3rys-sel-speak svg {
+  width: 14px;
+  height: 14px;
+}
+
+.b3rys-sel-word-original {
+  font-weight: 700;
+  color: #e5e5e5;
+}
+
+.b3rys-sel-word-dash {
+  color: #6b7280;
+  margin: 0 2px;
+}
+
+.b3rys-sel-word-translation {
+  font-weight: 700;
+  color: #7ee787;
+}
+
+/* English definition */
+.b3rys-sel-word-definition {
+  font-size: 12px;
+  color: #9ca3af;
+  line-height: 1.4;
+  margin-top: 2px;
+}
+
+/* Similar words */
+.b3rys-sel-word-similar {
+  font-size: 12px;
+  color: #9ca3af;
+  line-height: 1.4;
+  margin-top: 2px;
+}
+
+.b3rys-sel-word-similar-label {
+  color: #6b7280;
+}
+
+.b3rys-sel-word-similar-word {
+  color: #7ee787;
+}
+
+/* Separator */
+.b3rys-sel-separator {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 4px 0;
+}
+
+/* Example sentences */
+.b3rys-sel-example-en {
+  font-size: 13px;
+  color: #9ca3af;
+  line-height: 1.5;
+  margin-top: 6px;
+}
+
+.b3rys-sel-example-ko {
+  font-size: 13px;
+  color: #e5e5e5;
+  line-height: 1.5;
+  margin-bottom: 2px;
+}
+
+/* Highlighted word in example sentences */
+.b3rys-sel-highlight {
+  color: #7ee787;
+  font-weight: 600;
+}
+
+/* Error state */
+.b3rys-sel-error {
+  color: #f85149;
+  font-size: 13px;
+}
+
+@keyframes selSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes selFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
