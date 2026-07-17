@@ -113,6 +113,30 @@ body {
   animation: fadeIn 0.3s ease;
 }
 
+/* Onboarding variant of the banner — informative, not alarming */
+.error-banner.info {
+  background: var(--accent-glow);
+  border: 1px solid var(--accent-dim);
+  border-left: 3px solid var(--accent);
+}
+.error-banner.info .error-banner-text {
+  color: var(--accent);
+}
+
+/* "키 발급 ↗" link next to the API Key label — the key path for first-run users */
+.key-issue-link {
+  margin-left: 8px;
+  margin-right: auto;
+  font-size: 10.5px;
+  color: var(--accent);
+  text-decoration: none;
+  opacity: 0.85;
+}
+.key-issue-link:hover {
+  opacity: 1;
+  text-decoration: underline;
+}
+
 .error-banner-text {
   flex: 1;
   font-size: 11px;

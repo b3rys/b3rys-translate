@@ -10,10 +10,12 @@ import {
   ENGINE_PRICING,
 } from '@/utils/constants';
 
-const ENGINE_DASHBOARD_URLS: Record<EngineType, string> = {
+// Key issuance pages — the first-run path. (Usage dashboards live one click
+// away from these; issuance is what a new user actually needs.)
+const ENGINE_KEY_URLS: Record<EngineType, string> = {
   gemini: 'https://aistudio.google.com/apikey',
-  openai: 'https://platform.openai.com/usage',
-  anthropic: 'https://console.anthropic.com/settings/billing',
+  openai: 'https://platform.openai.com/api-keys',
+  anthropic: 'https://console.anthropic.com/settings/keys',
 };
 
 // 엔진 비교 툴팁용 한줄 설명 (가격은 ENGINE_PRICING 단일 출처에서 파생)
@@ -70,6 +72,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const ytBtnStatusText = document.getElementById('yt-btn-status') as HTMLSpanElement;
   const badgeModel = document.querySelector('.badge-model') as HTMLSpanElement;
   const badgeLink = document.getElementById('badge-link') as HTMLAnchorElement;
+  const keyIssueLink = document.getElementById('key-issue-link') as HTMLAnchorElement;
   const errorBanner = document.getElementById('api-error-banner') as HTMLDivElement;
   const errorMessage = document.getElementById('api-error-message') as HTMLSpanElement;
   const dismissError = document.getElementById('dismiss-error') as HTMLButtonElement;
@@ -96,6 +99,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     errorMessage.textContent = apiKeyErrorMessage;
     errorBanner.style.display = 'flex';
     await chrome.storage.local.remove('apiKeyErrorMessage');
+  } else {
+    // First-run onboarding: FAB was clicked with no API key saved
+    const { onboardingNotice } = await chrome.storage.local.get<{
+      onboardingNotice?: boolean;
+    }>('onboardingNotice');
+    if (onboardingNotice) {
+      errorMessage.textContent =
+        'API 키를 입력하면 바로 번역이 시작됩니다. "키 발급 ↗"에서 무료로 만들 수 있어요 (Gemini는 무료 할당량 제공).';
+      errorBanner.classList.add('info');
+      errorBanner.style.display = 'flex';
+      await chrome.storage.local.remove('onboardingNotice');
+    }
   }
 
   dismissError.addEventListener('click', () => {
@@ -236,7 +251,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function updateBadge(engine: EngineType) {
     badgeModel.textContent = ENGINE_DISPLAY_NAMES[engine];
-    badgeLink.href = ENGINE_DASHBOARD_URLS[engine];
+    badgeLink.href = ENGINE_KEY_URLS[engine];
+    keyIssueLink.href = ENGINE_KEY_URLS[engine];
   }
 
   function showStatus(text: string, type: 'success' | 'error') {
