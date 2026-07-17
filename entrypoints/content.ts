@@ -70,7 +70,13 @@ export default defineContentScript({
             engineApiKeys?: Record<string, string>;
           }>('engineApiKeys');
           const engine = selectedEngine || 'gemini';
-          return !!engineApiKeys?.[engine];
+          const hasKey = !!engineApiKeys?.[engine];
+          if (!hasKey) {
+            // First-run onboarding: the popup we're about to open should
+            // explain WHY it opened and point at the key-issuance link.
+            await chrome.storage.local.set({ onboardingNotice: true });
+          }
+          return hasKey;
         } catch (err) {
           if (isContextInvalidated(err)) {
             markContextInvalidated();
