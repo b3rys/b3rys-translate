@@ -1,6 +1,6 @@
 # 개인정보 처리방침 / Privacy Policy
 
-**최종 수정일 / Last Updated:** 2026-02-03
+**최종 수정일 / Last Updated:** 2026-07-17
 
 ---
 
@@ -8,7 +8,7 @@
 
 ### 개요
 
-b3rys translate(이하 "본 확장 프로그램")은 웹페이지와 YouTube 자막을 한국어로 번역하는 Chrome 확장 프로그램입니다. 본 확장 프로그램은 사용자의 개인정보를 수집, 저장 또는 전송하지 않습니다.
+b3rys translate(이하 "본 확장 프로그램")은 웹페이지와 YouTube 자막을 사용자가 선택한 언어로 번역하는 Chrome 확장 프로그램입니다. 본 확장 프로그램은 사용자의 개인정보를 수집, 저장 또는 전송하지 않습니다.
 
 ### 수집하지 않는 정보
 
@@ -47,7 +47,6 @@ b3rys translate(이하 "본 확장 프로그램")은 웹페이지와 YouTube 자
 - **Google Gemini** — `generativelanguage.googleapis.com`
 - **OpenAI** — `api.openai.com`
 - **Anthropic** — `api.anthropic.com`
-- **Google Cloud Translation** — `translation.googleapis.com`
 
 각 API 제공자의 데이터 처리에 대해서는 해당 서비스의 개인정보 처리방침을 참조하시기 바랍니다.
 
@@ -67,7 +66,7 @@ b3rys translate(이하 "본 확장 프로그램")은 웹페이지와 YouTube 자
 
 개인정보 관련 문의사항이 있으시면 아래 GitHub Issues를 통해 연락해 주시기 바랍니다.
 
-- https://github.com/makhae/b3rys-translate/issues
+- https://github.com/b3rys/b3rys-translate/issues
 
 ---
 
@@ -75,7 +74,7 @@ b3rys translate(이하 "본 확장 프로그램")은 웹페이지와 YouTube 자
 
 ### Overview
 
-b3rys translate ("the Extension") is a Chrome extension that translates web pages and YouTube subtitles into Korean. The Extension does not collect, store, or transmit any personal information.
+b3rys translate ("the Extension") is a Chrome extension that translates web pages and YouTube subtitles into the language you choose. The Extension does not collect, store, or transmit any personal information.
 
 ### Information We Do NOT Collect
 
@@ -114,7 +113,6 @@ Supported translation APIs:
 - **Google Gemini** — `generativelanguage.googleapis.com`
 - **OpenAI** — `api.openai.com`
 - **Anthropic** — `api.anthropic.com`
-- **Google Cloud Translation** — `translation.googleapis.com`
 
 Please refer to each API provider's privacy policy for details on how they handle data.
 
@@ -134,4 +132,4 @@ All stored data is automatically deleted when the Extension is uninstalled. To d
 
 For privacy-related inquiries, please reach out via GitHub Issues:
 
-- https://github.com/makhae/b3rys-translate/issues
+- https://github.com/b3rys/b3rys-translate/issues
