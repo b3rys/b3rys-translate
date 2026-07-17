@@ -35,6 +35,21 @@ export interface ToggleTranslationModeMessage {
   mode: 'parallel' | 'replace';
 }
 
+/**
+ * Pure cache read — no API call, no rate-limit slot, no usage stats.
+ * Lets the content script paint cached paragraphs instantly and send
+ * only the misses through TRANSLATE_BATCH.
+ */
+export interface CacheLookupRequest {
+  type: 'CACHE_LOOKUP';
+  paragraphs: { id: string; text: string }[];
+  targetLang?: string;
+}
+
+export interface CacheLookupResponse {
+  translations: { id: string; translatedText: string }[];
+}
+
 export interface OpenPopupRequest {
   type: 'OPEN_POPUP';
 }
@@ -47,7 +62,11 @@ export interface ClearCacheResponse {
   success: boolean;
 }
 
-export type BackgroundMessage = TranslateBatchRequest | OpenPopupRequest | ClearCacheRequest;
+export type BackgroundMessage =
+  | TranslateBatchRequest
+  | CacheLookupRequest
+  | OpenPopupRequest
+  | ClearCacheRequest;
 export type ContentMessage =
   | ToggleTranslationMessage
   | ToggleFloatingButtonMessage

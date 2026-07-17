@@ -220,6 +220,56 @@ function hasOnlyInlineChildren(el: HTMLElement): boolean {
   return true;
 }
 
+/**
+ * Composite-cell container: element children that read as separate visual cells
+ * (e.g. a news row: date | category | title). Their textContents concatenate
+ * with no whitespace, so translating the container as ONE unit produces run-on
+ * garbage ("Jul 14, 2026Product Introducing…" → "2026년 7월 14일제품…").
+ * Each cell must be its own translation unit instead.
+ *
+ * Detected structurally (no layout reads — deterministic in tests):
+ *   1. ≥2 direct element children carrying their own text
+ *   2. no loose text directly inside the container (a real sentence has some,
+ *      e.g. <p>Hello <strong>world</strong> again</p>)
+ *   3. at least one adjacent text-bearing pair whose texts would join without
+ *      any whitespace boundary — the "glue" that breaks translation
+ */
+export function isCompositeCells(el: HTMLElement): boolean {
+  const textKids = (Array.from(el.children) as HTMLElement[]).filter(
+    (c) => (c.textContent ?? '').trim().length > 0,
+  );
+  if (textKids.length < 2) return false;
+
+  for (const node of el.childNodes) {
+    if (node.nodeType === Node.TEXT_NODE && (node.textContent ?? '').trim()) return false;
+  }
+
+  for (let i = 0; i < textKids.length - 1; i++) {
+    const a = textKids[i].textContent ?? '';
+    const b = textKids[i + 1].textContent ?? '';
+    if (/\s$/.test(a) || /^\s/.test(b)) continue; // own edges provide a boundary
+    if (hasWhitespaceBetween(el, textKids[i], textKids[i + 1])) continue;
+    return true;
+  }
+  return false;
+}
+
+/** Any whitespace text node between siblings a and b (exclusive)? */
+function hasWhitespaceBetween(parent: HTMLElement, a: Element, b: Element): boolean {
+  let between = false;
+  for (const node of parent.childNodes) {
+    if (node === a) {
+      between = true;
+      continue;
+    }
+    if (node === b) break;
+    if (between && node.nodeType === Node.TEXT_NODE && /\s/.test(node.textContent ?? '')) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function detectLeafTextBlocks(root: Element): TextBlock[] {
   const blocks: TextBlock[] = [];
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, {
@@ -235,9 +285,13 @@ function detectLeafTextBlocks(root: Element): TextBlock[] {
         el.tagName === 'DIV' ||
         el.tagName === 'SPAN' ||
         el.tagName === 'A' ||
-        el.tagName === 'BUTTON'
+        el.tagName === 'BUTTON' ||
+        el.tagName === 'TIME'
       ) {
-        if (el.children.length === 0 || hasOnlyInlineChildren(el)) {
+        if (el.children.length === 0) return NodeFilter.FILTER_ACCEPT;
+        // Composite cells (date | category | title rows) must not merge into
+        // one unit — SKIP descends so each cell is detected on its own.
+        if (hasOnlyInlineChildren(el) && !isCompositeCells(el)) {
           return NodeFilter.FILTER_ACCEPT;
         }
       }
@@ -274,15 +328,29 @@ function detectLeafTextBlocks(root: Element): TextBlock[] {
  */
 const TEXT_BOUNDARY_TAGS = new Set(['BUTTON', 'FORM', 'DIALOG', 'DETAILS', 'TEMPLATE', 'NAV']);
 
-/** Get text content excluding child block elements, SKIP_TAGS, and TEXT_BOUNDARY_TAGS (recursive) */
+/**
+ * Is this child element a boundary for parent text collection?
+ * Semantic blocks, skip/interactive tags, and composite-cell containers all
+ * form their own translation units — their text must not bleed into the parent.
+ */
+function isTextCollectionBoundary(child: HTMLElement): boolean {
+  const tag = child.tagName;
+  return (
+    TRANSLATABLE_TAGS.has(tag) ||
+    SKIP_TAGS.has(tag) ||
+    TEXT_BOUNDARY_TAGS.has(tag) ||
+    isCompositeCells(child)
+  );
+}
+
+/** Get text content excluding boundary children (recursive) */
 function getDirectText(el: HTMLElement): string {
   let text = '';
   for (const child of el.childNodes) {
     if (child.nodeType === Node.TEXT_NODE) {
       text += child.textContent;
     } else if (child.nodeType === Node.ELEMENT_NODE) {
-      const tag = (child as HTMLElement).tagName;
-      if (TRANSLATABLE_TAGS.has(tag) || SKIP_TAGS.has(tag) || TEXT_BOUNDARY_TAGS.has(tag)) continue;
+      if (isTextCollectionBoundary(child as HTMLElement)) continue;
       text += getDirectText(child as HTMLElement);
     }
   }
@@ -311,7 +379,7 @@ function cleanForAPI(el: HTMLElement): string {
   return clone.outerHTML;
 }
 
-/** Get HTML content excluding child block/SKIP/boundary elements (preserves inline markup) */
+/** Get HTML content excluding boundary children (preserves inline markup) */
 function getDirectHTML(el: HTMLElement): string {
   let html = '';
   for (const child of el.childNodes) {
@@ -319,8 +387,7 @@ function getDirectHTML(el: HTMLElement): string {
       html += child.textContent ?? '';
     } else if (child.nodeType === Node.ELEMENT_NODE) {
       const childEl = child as HTMLElement;
-      const tag = childEl.tagName;
-      if (TRANSLATABLE_TAGS.has(tag) || SKIP_TAGS.has(tag) || TEXT_BOUNDARY_TAGS.has(tag)) continue;
+      if (isTextCollectionBoundary(childEl)) continue;
       html += cleanForAPI(childEl);
     }
   }

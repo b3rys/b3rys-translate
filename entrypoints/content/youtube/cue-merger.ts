@@ -41,6 +41,22 @@ export const TRAILING_FUNC_WORDS = new Set([
   'in',
   'on',
   'at',
+  'for',
+  'with',
+  'from',
+  'by',
+  'about',
+  'into',
+  'onto',
+  'over',
+  'under',
+  'through',
+  'between',
+  'during',
+  'against',
+  'without',
+  'upon',
+  'than',
   // be-verbs (need complement)
   'is',
   'are',
@@ -80,8 +96,17 @@ export const TRAILING_FUNC_WORDS = new Set([
   // negation
   'not',
   'no',
-  // conjunction-like (short)
+  // conjunctions (need following clause)
   'so',
+  'and',
+  'but',
+  'or',
+  'nor',
+  'because',
+  'if',
+  'when',
+  'while',
+  'whether',
 ]);
 
 /**
@@ -107,6 +132,71 @@ export function stripTrailingFuncWords(
   }
   if (end < text.length) {
     return { flush: text.substring(0, end).trim(), leftover: text.substring(end).trim() };
+  }
+  return { flush: text, leftover: '' };
+}
+
+// --- Forced-break refinement ---
+// When a chunk is flushed because it hit a hard limit (chars/time) rather than a
+// natural boundary, the raw cut can land on a word that grammatically leans on
+// what follows ("...multiple copies of your |"). A BreakRefiner proposes a more
+// natural split of the accumulated text. Refiners are tried in priority order and
+// the first proposal wins — new heuristics slot in without touching the merge loop.
+
+export interface RefineOptions {
+  minFlush: number; // smallest acceptable prefix (chars)
+  minLeftover: number; // smallest acceptable remainder (chars)
+}
+
+export type BreakRefiner = (
+  text: string,
+  opts: RefineOptions,
+) => { flush: string; leftover: string } | null;
+
+/** Prefer the comma nearest the middle — clauses read as complete units. */
+export const commaBreakRefiner: BreakRefiner = (text, opts) => {
+  const mid = text.length / 2;
+  let best = -1;
+  let bestDist = Infinity;
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] !== ',') continue;
+    const pos = i + 1;
+    if (pos < opts.minFlush || text.length - pos < opts.minLeftover) continue;
+    const dist = Math.abs(pos - mid);
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = pos;
+    }
+  }
+  if (best < 0) return null;
+  return { flush: text.substring(0, best).trim(), leftover: text.substring(best).trim() };
+};
+
+/** Never end a chunk on a word that depends on the next one (articles, prepositions…). */
+export const funcWordBreakRefiner: BreakRefiner = (text, opts) => {
+  const { flush, leftover } = stripTrailingFuncWords(text, opts.minFlush);
+  return leftover ? { flush, leftover } : null;
+};
+
+const FORCED_BREAK_REFINERS: BreakRefiner[] = [commaBreakRefiner, funcWordBreakRefiner];
+
+/** Cue-boundary cuts that already land on punctuation need no refinement. */
+const ENDS_NATURALLY_RE = /[,;:.!?]$/;
+
+/**
+ * Refine a forced (limit-triggered) break point.
+ * Falls back to the raw text when no refiner has a better proposal.
+ */
+export function refineForcedBreak(
+  text: string,
+  opts: RefineOptions,
+  refiners: BreakRefiner[] = FORCED_BREAK_REFINERS,
+): { flush: string; leftover: string } {
+  if (!ENDS_NATURALLY_RE.test(text)) {
+    for (const refine of refiners) {
+      const result = refine(text, opts);
+      if (result) return result;
+    }
   }
   return { flush: text, leftover: '' };
 }
@@ -412,6 +502,33 @@ export function mergeCues(cues: SubtitleCue[], config?: PostProcessConfig): Subt
     chunk = [];
   }
 
+  /**
+   * Forced flush (char/time limit hit — not a natural boundary): refine the
+   * break so the chunk doesn't end mid-phrase. The leftover seeds the next
+   * chunk with proportional timing (same trade-off as postProcessCues splits).
+   */
+  function flushForced() {
+    if (chunk.length === 0) return;
+    const text = chunk
+      .map((c) => c.text)
+      .join(' ')
+      .trim();
+    const { flush: head, leftover } = refineForcedBreak(text, {
+      minFlush: 25,
+      minLeftover: 10,
+    });
+    if (!leftover) {
+      flush();
+      return;
+    }
+    const start = chunk[0].start;
+    const last = chunk[chunk.length - 1];
+    const end = last.start + last.duration;
+    const headEnd = start + (end - start) * (head.length / text.length);
+    merged.push({ start, duration: headEnd - start, text: head });
+    chunk = [{ start: headEnd, duration: end - headEnd, text: leftover }];
+  }
+
   for (const cue of split) {
     if (chunk.length > 0) {
       const text = chunk
@@ -433,7 +550,7 @@ export function mergeCues(cues: SubtitleCue[], config?: PostProcessConfig): Subt
         const wouldBe = text + ' ' + cue.text.trim();
         const wouldElapse = cue.start + cue.duration - chunk[0].start;
         if (wouldBe.length >= MAX_CHARS || wouldElapse >= MAX_TIME) {
-          flush();
+          flushForced();
         }
       }
     }

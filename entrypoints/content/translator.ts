@@ -1,5 +1,5 @@
 import type { TextBlock, TranslationMode } from '@/types';
-import type { TranslateBatchResponse } from '@/utils/messaging';
+import type { TranslateBatchResponse, CacheLookupResponse } from '@/utils/messaging';
 import {
   BATCH_SIZE,
   VIEWPORT_BATCH_SIZE,
@@ -8,6 +8,7 @@ import {
   TRANSLATABLE_TAGS,
 } from '@/utils/constants';
 import { getSiteRule } from '@/utils/site-rules';
+import { isFighting, recordInjection } from '@/utils/fight-guard';
 import { detectTextBlocks } from './text-detector';
 import { isContextInvalidated, markContextInvalidated } from './context-invalidated';
 
@@ -16,24 +17,107 @@ const REPLACE_MODE_CLASS = 'b3rys-replace-mode';
 
 // --- Scroll preservation ---
 
+interface ScrollAnchor {
+  el: Element;
+  top: number;
+  /** Scroll container being pinned — null means the window scrolls. */
+  scroller: HTMLElement | null;
+}
+
 /**
- * Find a stable reference element near viewport top (not a translation element).
+ * Nearest scrollable ancestor that actually overflows; null = window scroller.
+ * Apps like Gmail scroll an inner div, not the document — compensating the
+ * window there nudges the wrong scroller and makes the view stutter.
  */
-function findScrollRef(): { el: Element; top: number } | null {
-  const htmlEl = document.documentElement;
-  let el: Element | null = document.elementFromPoint(window.innerWidth / 2, 100);
-  while (
-    el &&
-    el !== document.body &&
-    el !== htmlEl &&
-    (el.hasAttribute?.('data-b3rys-translated') ||
-      el.hasAttribute?.('data-b3rys-original') ||
-      el.closest?.('[data-b3rys-translated]'))
-  ) {
-    el = el.parentElement;
+function getScrollContainer(el: Element): HTMLElement | null {
+  let node = el.parentElement;
+  while (node && node !== document.body && node !== document.documentElement) {
+    const style = getComputedStyle(node);
+    if (/(auto|scroll|overlay)/.test(style.overflowY) && node.scrollHeight > node.clientHeight) {
+      return node;
+    }
+    node = node.parentElement;
   }
-  if (!el || el === document.body || el === htmlEl) return null;
-  return { el, top: el.getBoundingClientRect().top };
+  return null;
+}
+
+function isB3rysOwned(el: Element): boolean {
+  return (
+    !!el.hasAttribute?.('data-b3rys-translated') ||
+    !!el.hasAttribute?.('data-b3rys-original') ||
+    !!el.closest?.('[data-b3rys-translated]')
+  );
+}
+
+/**
+ * Is the element pinned to the viewport (fixed/sticky ancestor chain)?
+ * A pinned element never moves when content grows, so using it as a drift
+ * anchor silently disables compensation — on ANY site with a sticky header,
+ * not just inner-scroller apps.
+ */
+export function isViewportPinned(el: Element, boundary: Element | null): boolean {
+  let node: Element | null = el;
+  const stop = boundary ?? document.body;
+  while (node && node !== stop && node !== document.documentElement) {
+    const position = getComputedStyle(node).position;
+    if (position === 'fixed' || position === 'sticky') return true;
+    node = node.parentElement;
+  }
+  return false;
+}
+
+/**
+ * Pick a stable anchor element INSIDE the given scroller, near the top of its
+ * visible area. The old approach probed at window coordinates (center, y=100),
+ * which in apps like Gmail lands on the *fixed* toolbar — an element that never
+ * moves when content grows, so drift always measured 0 and no correction ever
+ * ran. Probing is scroller-relative and retries deeper points until it finds an
+ * element that actually lives inside the scrolled content.
+ */
+function findContentAnchor(scroller: HTMLElement | null): ScrollAnchor | null {
+  const rect = scroller
+    ? scroller.getBoundingClientRect()
+    : { top: 0, left: 0, width: window.innerWidth, height: window.innerHeight };
+  const x = rect.left + rect.width / 2;
+  const maxY = Math.min(rect.top + rect.height, window.innerHeight);
+
+  for (const dy of [60, 140, 240, 360]) {
+    const y = rect.top + dy;
+    if (y >= maxY) break;
+    let el: Element | null = document.elementFromPoint(x, y);
+    while (el && isB3rysOwned(el)) el = el.parentElement;
+    if (!el || el === document.body || el === document.documentElement) continue;
+    // Landed on fixed chrome or an overlay outside the scroller → probe deeper
+    if (scroller && !scroller.contains(el)) continue;
+    // Fixed/sticky elements (site headers!) never move with content — an
+    // anchor there measures drift 0 forever and disables compensation.
+    if (isViewportPinned(el, scroller)) continue;
+    return { el, top: el.getBoundingClientRect().top, scroller };
+  }
+  return null;
+}
+
+/** Correct residual drift on the scroller that actually moved. */
+function applyDriftCorrection(anchor: ScrollAnchor): void {
+  const drift = anchor.el.getBoundingClientRect().top - anchor.top;
+  if (Math.abs(drift) <= 1) return;
+  if (anchor.scroller) {
+    anchor.scroller.scrollTop += drift;
+  } else {
+    window.scrollBy(0, drift);
+  }
+}
+
+/**
+ * Run a DOM mutation while keeping the given scroller's view visually pinned.
+ * ALL translation-related mutations (loaders in/out, injections, errors) must
+ * go through this — un-compensated mutations above the viewport are exactly
+ * what makes the page stutter while the user scrolls.
+ */
+function withScrollCompensation(scroller: HTMLElement | null, mutate: () => void): void {
+  const anchor = findContentAnchor(scroller);
+  mutate();
+  if (anchor) applyDriftCorrection(anchor);
 }
 
 export function cancelTranslation(): void {
@@ -41,12 +125,28 @@ export function cancelTranslation(): void {
   cleanupLoaders(); // immediately remove DOM loading indicators
 }
 
+/**
+ * Outcome of a translation pass:
+ * - 'done':      completed; at least one block was found/injected
+ * - 'cancelled': superseded mid-flight (newer pass or content swap)
+ * - 'empty':     detection found no new blocks — a genuine no-op. Callers must
+ *                NOT treat this as a "start" for circuit-breaker purposes, or a
+ *                busy page (Gmail) trips the breaker with nothing to translate.
+ */
+export type TranslationResult = 'done' | 'cancelled' | 'empty';
+
 export async function translatePage(
   onProgress?: (completed: number, total: number) => void,
-): Promise<'done' | 'cancelled'> {
-  // Purge any CSS-hidden translations from previous toggle-off.
-  // Elements are display:none so removal causes no layout shift.
-  purgeAllTranslations();
+): Promise<TranslationResult> {
+  // Purge CSS-hidden translations left over from a previous toggle-off
+  // (they're display:none, so removal causes no layout shift). ONLY then —
+  // purging unconditionally strips every BLOCK_ID and rips live translations
+  // out, turning every incremental pass into a full re-detect + re-inject of
+  // the whole page: massive visible churn, and the breaker counts each pass
+  // as productive work.
+  if (document.body.classList.contains(HIDING_CLASS)) {
+    purgeAllTranslations();
+  }
 
   // Force scroll anchoring + hide scrollbar indicator during translation.
   // - overflow-anchor:auto → browser keeps viewport stable when translations
@@ -65,15 +165,34 @@ export async function translatePage(
   };
 
   const gen = ++translateGen;
-  const allBlocks = detectTextBlocks();
+  // Fight guard: blocks the app keeps re-rendering (wiping our injection) are
+  // yielded after a few rounds — retranslating them just fights the app's
+  // renderer (visible stutter + breaker pressure). Filtered blocks make the
+  // pass 'empty' when nothing else is new, keeping the breaker quiet.
+  const allBlocks = detectTextBlocks().filter((b) => !isFighting(b.text));
   if (allBlocks.length === 0) {
+    restoreScrollStyles();
+    return 'empty'; // nothing new to translate — a no-op pass
+  }
+
+  const total = allBlocks.length;
+  let completed = 0;
+
+  // Phase 0: cached paragraphs paint instantly — no API call, no rate-limit
+  // slot. Only genuine misses continue into the batched API phases below.
+  const misses = await injectCachedTranslations(allBlocks, gen);
+  if (gen !== translateGen) {
+    restoreScrollStyles();
+    return 'cancelled';
+  }
+  completed += total - misses.length;
+  if (completed > 0) onProgress?.(completed, total);
+  if (misses.length === 0) {
     restoreScrollStyles();
     return 'done';
   }
 
-  const { mainViewport, sideViewport, remaining } = classifyBlocks(allBlocks);
-  const total = allBlocks.length;
-  let completed = 0;
+  const { mainViewport, sideViewport, remaining } = classifyBlocks(misses);
 
   // Phase 1a: Main content in viewport — highest priority for perceived speed
   if ((await runBatches(mainViewport, VIEWPORT_BATCH_SIZE, gen)) === 'cancelled') {
@@ -191,6 +310,39 @@ async function runBatchesThrottled(
   return 'done';
 }
 
+/**
+ * Phase 0: inject cache hits for the given blocks and return the misses.
+ * A pure cache read in the background — repeat visits paint instantly and
+ * only new paragraphs consume API calls / rate-limit slots.
+ * Lookup failure is non-fatal: everything falls back to the normal batch path.
+ */
+async function injectCachedTranslations(blocks: TextBlock[], gen: number): Promise<TextBlock[]> {
+  try {
+    const response: CacheLookupResponse = await chrome.runtime.sendMessage({
+      type: 'CACHE_LOOKUP',
+      paragraphs: blocks.map((b) => ({ id: b.id, text: b.html })),
+    });
+    if (gen !== translateGen) return [];
+
+    const hits = new Map((response?.translations ?? []).map((t) => [t.id, t.translatedText]));
+    if (hits.size === 0) return blocks;
+
+    const blockMap = new Map(blocks.map((b) => [b.id, b]));
+    withScrollCompensation(getScrollContainer(blocks[0].element), () => {
+      for (const [id, translatedText] of hits) {
+        const block = blockMap.get(id);
+        if (block) {
+          injectTranslation(block.element, translatedText);
+          recordInjection(block.text);
+        }
+      }
+    });
+    return blocks.filter((b) => !hits.has(b.id));
+  } catch {
+    return blocks; // cache lookup is an optimization, never a blocker
+  }
+}
+
 export function hasTranslationsOnPage(): boolean {
   // CSS-hidden translations don't count — they're "off" from user perspective
   if (document.body.classList.contains(HIDING_CLASS)) return false;
@@ -224,19 +376,14 @@ export function removeAllTranslations(): void {
   scrollEl.style.overflowAnchor = 'auto';
   scrollEl.style.scrollbarWidth = 'none';
 
-  const ref = findScrollRef();
-
-  document.body.classList.remove(REPLACE_MODE_CLASS);
-  document.body.classList.add(HIDING_CLASS);
-  cleanupLoaders();
-
-  // Compensate residual drift (scrollbar hidden so no indicator flash)
-  if (ref) {
-    const drift = ref.el.getBoundingClientRect().top - ref.top;
-    if (Math.abs(drift) > 1) {
-      window.scrollBy(0, drift);
-    }
-  }
+  // Pin the scroller that actually holds the translations being hidden
+  const firstTranslated = document.querySelector(`[${DATA_ATTRS.TRANSLATED}]`);
+  const scroller = firstTranslated ? getScrollContainer(firstTranslated) : null;
+  withScrollCompensation(scroller, () => {
+    document.body.classList.remove(REPLACE_MODE_CLASS);
+    document.body.classList.add(HIDING_CLASS);
+    cleanupLoaders();
+  });
 
   setTimeout(() => {
     scrollEl.style.overflowAnchor = prevAnchor;
@@ -280,7 +427,15 @@ export function purgeAllTranslations(): void {
 async function processBatch(batch: TextBlock[], gen: number): Promise<void> {
   if (gen !== translateGen) return;
 
-  const loaders = batch.map((block) => showLoading(block.element));
+  // Every DOM mutation below is compensated against the batch's own scroller —
+  // un-compensated loader/error/injection churn above the viewport is what
+  // made pages stutter while the user scrolled (esp. inner-scroller apps).
+  const scroller = getScrollContainer(batch[0].element);
+
+  let loaders: HTMLElement[] = [];
+  withScrollCompensation(scroller, () => {
+    loaders = batch.map((block) => showLoading(block.element));
+  });
 
   try {
     const response: TranslateBatchResponse = await chrome.runtime.sendMessage({
@@ -288,45 +443,53 @@ async function processBatch(batch: TextBlock[], gen: number): Promise<void> {
       paragraphs: batch.map((b) => ({ id: b.id, text: b.html })),
     });
 
-    loaders.forEach((loader) => loader.remove());
-    if (gen !== translateGen) return;
+    if (gen !== translateGen) {
+      withScrollCompensation(scroller, () => loaders.forEach((loader) => loader.remove()));
+      return;
+    }
 
     if (response.error) {
       if (response.apiKeyError || response.costLimitExceeded) {
+        withScrollCompensation(scroller, () => loaders.forEach((loader) => loader.remove()));
         translateGen++; // Cancel all in-flight batches
         await chrome.storage.local.set({ apiKeyErrorMessage: response.error });
         chrome.runtime.sendMessage({ type: 'OPEN_POPUP' }).catch(() => {});
         return;
       }
-      batch.forEach((block) => showError(block.element, response.error!));
+      withScrollCompensation(scroller, () => {
+        loaders.forEach((loader) => loader.remove());
+        batch.forEach((block) => showError(block.element, response.error!));
+      });
       return;
     }
 
     const blockMap = new Map(batch.map((b) => [b.id, b]));
-    const ref = findScrollRef();
-    for (const result of response.translations) {
-      const block = blockMap.get(result.id);
-      if (block) {
-        injectTranslation(block.element, result.translatedText);
+    withScrollCompensation(scroller, () => {
+      loaders.forEach((loader) => loader.remove());
+      for (const result of response.translations) {
+        const block = blockMap.get(result.id);
+        if (block) {
+          injectTranslation(block.element, result.translatedText);
+          recordInjection(block.text);
+        }
       }
-    }
-    // Compensate residual drift (scrollbar hidden by translatePage)
-    if (ref) {
-      const drift = ref.el.getBoundingClientRect().top - ref.top;
-      if (Math.abs(drift) > 1) {
-        window.scrollBy(0, drift);
-      }
-    }
+    });
   } catch (err) {
-    loaders.forEach((loader) => loader.remove());
-    if (gen !== translateGen) return;
     if (isContextInvalidated(err)) {
+      loaders.forEach((loader) => loader.remove());
       translateGen++;
       markContextInvalidated();
       return;
     }
+    if (gen !== translateGen) {
+      withScrollCompensation(scroller, () => loaders.forEach((loader) => loader.remove()));
+      return;
+    }
     const msg = err instanceof Error ? err.message : 'Translation failed';
-    batch.forEach((block) => showError(block.element, msg));
+    withScrollCompensation(scroller, () => {
+      loaders.forEach((loader) => loader.remove());
+      batch.forEach((block) => showError(block.element, msg));
+    });
   }
 }
 
@@ -410,7 +573,6 @@ function isSiblingTarget(rule: ReturnType<typeof getSiteRule>, element: HTMLElem
 
 /** Short nav items (LI, A inside LI): inline inside label */
 function injectNavItem(element: HTMLElement, sanitized: string, text: string): void {
-  markOriginalContent(element);
   const span = document.createElement('span');
   span.setAttribute(DATA_ATTRS.TRANSLATED, 'true');
   span.className = 'b3rys-translation-inline';
@@ -426,12 +588,13 @@ function injectNavItem(element: HTMLElement, sanitized: string, text: string): v
   const link = element.tagName === 'LI' ? element.querySelector('a') : element;
   const target = link ?? element;
   const labelEl = findTextLabel(target as HTMLElement, text);
-  (labelEl ?? target).appendChild(span);
+  const dest = (labelEl ?? target) as HTMLElement;
+  markOriginalContent(element, dest);
+  dest.appendChild(span);
 }
 
 /** Non-standard inline elements (span, etc.): inject as sibling or inline child */
 function injectAsSibling(element: HTMLElement, sanitized: string, truncated: boolean): void {
-  element.setAttribute(DATA_ATTRS.ORIGINAL, 'true');
   const span = document.createElement('span');
   span.setAttribute(DATA_ATTRS.TRANSLATED, 'true');
   span.innerHTML = sanitized;
@@ -447,18 +610,19 @@ function injectAsSibling(element: HTMLElement, sanitized: string, truncated: boo
     // inject inside the child with the most text content
     const textChild = findLargestTextChild(element);
     span.className = 'b3rys-translation-inline';
-    if (textChild) {
-      textChild.appendChild(span);
-    } else {
-      element.appendChild(span);
-    }
+    const dest = textChild ?? element;
+    markOriginalContent(element, dest);
+    dest.appendChild(span);
   } else if (isFlexChild) {
     // Parent is flex — inject inside element as inline
     span.className = 'b3rys-translation-inline';
+    markOriginalContent(element);
     element.appendChild(span);
   } else {
+    // Translation is a real sibling *outside* element — hide the whole element.
     span.className = 'b3rys-translation';
     if (truncated) applyTruncationStyles(span);
+    element.setAttribute(DATA_ATTRS.ORIGINAL, 'true');
     element.after(span);
   }
 }
@@ -481,7 +645,6 @@ function injectBlock(
   text: string,
   truncated: boolean,
 ): void {
-  markOriginalContent(element);
   const span = document.createElement('span');
   span.setAttribute(DATA_ATTRS.TRANSLATED, 'true');
   span.innerHTML = sanitized;
@@ -507,6 +670,7 @@ function injectBlock(
         !alwaysBlock && text.length <= INLINE_MAX_LENGTH
           ? 'b3rys-translation-inline'
           : 'b3rys-translation';
+      markOriginalContent(element, flexTarget);
       flexTarget.appendChild(span);
       return;
     }
@@ -518,6 +682,7 @@ function injectBlock(
   const soleLink = !TRANSLATABLE_TAGS.has(element.tagName) ? getSoleLink(element) : null;
   if (soleLink) {
     span.className = 'b3rys-translation';
+    markOriginalContent(element, soleLink);
     soleLink.appendChild(span);
     return;
   }
@@ -539,6 +704,7 @@ function injectBlock(
     element.appendChild(br);
   }
 
+  markOriginalContent(element);
   element.appendChild(span);
 }
 
@@ -620,22 +786,59 @@ function hasActiveTruncation(el: HTMLElement): boolean {
 }
 
 /**
- * Mark element's original children so they can be hidden in replace mode.
+ * Mark original content so it can be hidden in replace mode, while keeping the
+ * branch that will hold the translation visible.
+ *
+ * The translation span may be injected into a *descendant* of `element` (e.g. a
+ * flex/grid text child, or a sole <a>). If we blindly marked `element`'s direct
+ * children, that descendant's marked ancestor would be `display:none` in replace
+ * mode and take the translation down with it. So when a `target` is given, we
+ * walk element → target and mark only the *siblings* along that path, leaving the
+ * ancestor chain to the translation visible.
+ *
  * - Element children: add data-b3rys-original attribute directly (preserves flex layout)
  * - Text nodes: wrap in <span data-b3rys-original> (text nodes can't have attributes)
+ *
+ * parallel (A+가) mode is unaffected — the hide rule is scoped to
+ * `body.b3rys-replace-mode`, so these attributes are inert there.
  */
-function markOriginalContent(element: HTMLElement): void {
-  if (element.querySelector(`:scope > [${DATA_ATTRS.ORIGINAL}]`)) return;
+function markOriginalContent(element: HTMLElement, target?: HTMLElement): void {
+  const dest = target && element.contains(target) ? target : element;
 
-  for (const child of Array.from(element.childNodes)) {
+  // Invariant: the branch from `element` down to `dest` stays visible in replace
+  // mode; every *other* original node is marked and hidden. Clearing ORIGINAL on
+  // the path makes this self-correcting if a prior run marked an ancestor.
+  let node: HTMLElement = element;
+  while (node !== dest) {
+    const next = Array.from(node.children).find((c) => c === dest || c.contains(dest)) as
+      | HTMLElement
+      | undefined;
+    markSiblingOriginals(node, next);
+    if (!next) return; // path broke unexpectedly — stop rather than mis-mark
+    next.removeAttribute(DATA_ATTRS.ORIGINAL);
+    node = next;
+  }
+  dest.removeAttribute(DATA_ATTRS.ORIGINAL);
+  markSiblingOriginals(dest, undefined);
+}
+
+/** Mark a parent's original child nodes, skipping the on-path child (`exclude`). */
+function markSiblingOriginals(parent: HTMLElement, exclude?: HTMLElement): void {
+  for (const child of Array.from(parent.childNodes)) {
     if (child.nodeType === Node.ELEMENT_NODE) {
       const el = child as HTMLElement;
-      if (el.hasAttribute(DATA_ATTRS.TRANSLATED) || el.hasAttribute(DATA_ATTRS.LOADER)) continue;
+      if (el === exclude) continue;
+      if (
+        el.hasAttribute(DATA_ATTRS.TRANSLATED) ||
+        el.hasAttribute(DATA_ATTRS.LOADER) ||
+        el.hasAttribute(DATA_ATTRS.ORIGINAL)
+      )
+        continue;
       el.setAttribute(DATA_ATTRS.ORIGINAL, 'true');
     } else if (child.nodeType === Node.TEXT_NODE && child.textContent?.trim()) {
       const wrapper = document.createElement('span');
       wrapper.setAttribute(DATA_ATTRS.ORIGINAL, 'true');
-      element.insertBefore(wrapper, child);
+      parent.insertBefore(wrapper, child);
       wrapper.appendChild(child);
     }
   }

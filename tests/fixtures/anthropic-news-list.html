@@ -1,0 +1,12 @@
+<!-- anthropic.com/news publication list: composite rows (date | category | title).
+     Cells are sibling elements whose textContents concatenate with NO whitespace —
+     merging them into one translation unit produces run-on garbage.
+     NOTE: the glued (no-whitespace) markup below IS the test semantics — this file
+     is excluded from prettier (.prettierignore) so it never gets reformatted. -->
+<div class="PublicationList-root">
+  <div class="PublicationList-listHeader"><span class="headerDate caption">Date</span><span class="headerCategory caption">Category</span><span class="headerTitle caption">Title</span></div>
+  <ul class="PublicationList-list">
+    <li><a href="/news/claude-for-teachers" class="listItem"><div class="meta"><time class="date">Jul 14, 2026</time><span class="subject">Product</span></div><span class="title">Introducing Claude for Teachers</span></a></li>
+    <li><a href="/news/canadian-ai-research" class="listItem"><div class="meta"><time class="date">Jul 14, 2026</time><span class="subject">Announcements</span></div><span class="title">Anthropic commits $10 million to Canadian AI research</span></a></li>
+  </ul>
+</div>

@@ -5,16 +5,22 @@
  * See safety-rules skill for full transition table.
  */
 import type { FloatingButtonState, TranslationMode } from '@/types';
+import type { TranslationResult } from '@/entrypoints/content/translator';
 import { checkCircuitBreaker } from './circuit-breaker';
 
 const CIRCUIT_WINDOW = 60_000; // 1 minute
 const CIRCUIT_MAX = 15; // max translation starts per window
 const ERROR_RECOVERY_MS = 3000;
 
+/**
+ * What an observed DOM change means for translation:
+ * - 'added':    content grew, detected blocks intact → incremental handling
+ * - 'replaced': detected blocks were removed (SPA navigation) → restart
+ */
+export type ContentChangeKind = 'added' | 'replaced';
+
 export interface StateMachineDeps {
-  translatePage(
-    onProgress: (completed: number, total: number) => void,
-  ): Promise<'done' | 'cancelled'>;
+  translatePage(onProgress: (completed: number, total: number) => void): Promise<TranslationResult>;
   removeAllTranslations(): void;
   cancelTranslation(): void;
   hasTranslationsOnPage(): boolean;
@@ -74,14 +80,23 @@ export class TranslationStateMachine {
     await this.startTranslation();
   }
 
-  onObserverContent(): void {
+  onObserverContent(kind: ContentChangeKind = 'added'): void {
     if (this._state === 'done') {
       // Incremental: translate only new blocks (existing BLOCK_IDs preserved)
       void this.startTranslation().catch(() => {});
     } else if (this._state === 'loading') {
-      // Cancel current translation and restart for new content
-      this.pendingRestart = true;
-      this.deps.cancelTranslation();
+      if (kind === 'replaced') {
+        // Real content swap (SPA navigation) — in-flight results are stale.
+        // Cancel and rebuild from scratch once translatePage unwinds.
+        this.pendingRestart = true;
+        this.deps.cancelTranslation();
+      } else {
+        // Content merely grew (e.g. Gmail app chrome churning while a long
+        // mail translates). Cancelling would discard already-paid batches and
+        // rip out injected translations — schedule an incremental pass for
+        // after completion instead.
+        this.pendingRestart = true;
+      }
     }
   }
 
@@ -118,7 +133,9 @@ export class TranslationStateMachine {
       this.errorTimeout = null;
     }
 
-    // Circuit breaker: block runaway loops before any API call
+    // Circuit breaker: block runaway loops before any API call.
+    // Note: the start is *recorded* only after a productive pass (see below),
+    // so no-op passes on a busy page (Gmail churn) never trip it.
     const now = Date.now();
     if (checkCircuitBreaker(this.recentStarts, now, CIRCUIT_MAX, CIRCUIT_WINDOW).tripped) {
       console.error('[b3rys] Circuit breaker tripped — switching to manual-only mode');
@@ -126,7 +143,6 @@ export class TranslationStateMachine {
       await this.deps.persistEnabled(false);
       return;
     }
-    this.recentStarts.push(now);
 
     // Check API key before starting — open popup if missing
     if (!(await this.deps.checkApiKey())) {
@@ -147,27 +163,54 @@ export class TranslationStateMachine {
       });
       // A newer startTranslation() (or cancel) superseded us — don't touch state
       if (myGen !== this.startGen) return;
+
+      // Record the start for loop detection ONLY if the pass did real work.
+      // An 'empty' pass (nothing new to translate) is a no-op and must not
+      // count, or a churning page trips the breaker with nothing to translate.
+      if (result !== 'empty') this.recentStarts.push(now);
+
       if (result === 'cancelled') {
-        // Content changed during translation — restart for new content
+        // Content changed during translation — restart for new content.
+        // NO removeAllTranslations here: swapped-out nodes took their
+        // translations with them, and translations on still-present elements
+        // are valid. Ripping the whole page out was itself a huge visible
+        // stutter when an app (Gmail) kept re-rendering its own widgets.
         if (this.pendingRestart) {
           this.pendingRestart = false;
-          this.deps.removeAllTranslations();
           this.setState('idle');
           this.deps.onProgress(0);
           await this.startTranslation();
           return;
         }
-        if (this.deps.hasTranslationsOnPage()) {
-          this.setState('done');
-        } else {
-          this.setState('idle');
-        }
+        this.setState(this.deps.hasTranslationsOnPage() ? 'done' : 'idle');
         this.deps.onProgress(0);
         await this.deps.persistEnabled(false);
         return;
       }
+
+      if (result === 'empty') {
+        // No-op pass: settle by what's already on the page, and do NOT recurse
+        // on pendingRestart — there was nothing new, so it would only spin.
+        this.pendingRestart = false;
+        this.deps.onProgress(0);
+        if (this.deps.hasTranslationsOnPage()) {
+          this.setState('done');
+        } else {
+          this.setState('idle');
+          await this.deps.persistEnabled(false);
+        }
+        return;
+      }
+
+      // result === 'done'
       this.setState('done');
       this.deps.setTranslationMode(this._mode);
+      // Content that arrived while we were translating ('added' during loading):
+      // handle incrementally — existing translations stay, only new blocks run.
+      if (this.pendingRestart) {
+        this.pendingRestart = false;
+        await this.startTranslation();
+      }
     } catch {
       if (myGen !== this.startGen) return; // superseded — don't touch state
       this.setState('error');

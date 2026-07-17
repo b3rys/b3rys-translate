@@ -11,7 +11,6 @@
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  overflow: hidden;
 }
 
 .b3rys-subtitle-line {
@@ -19,12 +18,12 @@
   padding: 4px 12px;
   border-radius: 4px;
   font-family: 'YouTube Noto', Roboto, Arial, sans-serif;
-  font-size: clamp(16px, 2.2vw, 36px);
+  /* Fallback size only — the effective size is injected from JS (player-relative). */
+  font-size: clamp(16px, 1.8vw, 34px);
   line-height: 1.4;
+  /* Always a single line — never wrap, and never clip the tail with an ellipsis. */
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 90%;
+  max-width: none;
 }
 
 .b3rys-subtitle-original {

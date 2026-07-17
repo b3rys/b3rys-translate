@@ -240,22 +240,49 @@ function decodeEntities(text: string): string {
 }
 
 const FONT_STYLE_ID = 'b3rys-subtitle-font';
+let playerResizeObserver: ResizeObserver | null = null;
 
 /**
- * Inject a <style> tag for responsive subtitle font size.
- * Uses vw units so font scales automatically with window/fullscreen.
+ * Recompute the subtitle font size from the *player* width, not the window.
+ * vw units scale with the whole viewport, so the text ballooned in a wide
+ * window or fullscreen even when the player itself was small. Scaling off the
+ * player's own width (like YouTube's native captions) keeps the size in
+ * proportion to the video in every layout.
+ */
+function updateFontSize(): void {
+  const player = document.getElementById('movie_player');
+  const style = document.getElementById(FONT_STYLE_ID);
+  if (!player || !style) return;
+  const px = Math.round(Math.min(38, Math.max(16, player.clientWidth * 0.023)));
+  style.textContent = `.b3rys-subtitle-line { font-size: ${px}px !important; }`;
+}
+
+/**
+ * Inject the font-size <style> tag and keep it in sync with the player size.
  * Injected via JS to bypass content script CSS caching issues.
  */
 function injectFontSizeStyle(): void {
-  if (document.getElementById(FONT_STYLE_ID)) return;
-  const style = document.createElement('style');
-  style.id = FONT_STYLE_ID;
-  style.textContent = '.b3rys-subtitle-line { font-size: clamp(16px, 2.2vw, 36px) !important; }';
-  document.head.appendChild(style);
+  if (!document.getElementById(FONT_STYLE_ID)) {
+    const style = document.createElement('style');
+    style.id = FONT_STYLE_ID;
+    document.head.appendChild(style);
+  }
+  updateFontSize();
+
+  const player = document.getElementById('movie_player');
+  if (player && 'ResizeObserver' in window) {
+    playerResizeObserver = new ResizeObserver(() => updateFontSize());
+    playerResizeObserver.observe(player);
+  }
+  // Fullscreen transitions don't always resize #movie_player synchronously.
+  document.addEventListener('fullscreenchange', updateFontSize);
 }
 
 function removeFontSizeStyle(): void {
   document.getElementById(FONT_STYLE_ID)?.remove();
+  playerResizeObserver?.disconnect();
+  playerResizeObserver = null;
+  document.removeEventListener('fullscreenchange', updateFontSize);
 }
 
 /**

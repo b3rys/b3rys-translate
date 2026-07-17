@@ -35,6 +35,7 @@ description: YouTube 자막 번역 룰 (파이프라인, cue 병합, rolling 번
 - 문장 끝 (. ! ?) → 합치다가 문장이 끝나면 거기서 끊음
 - 접속사 (and, but, so, however, because, although 등) → 이미 3초 이상 또는 60자 이상이면 접속사 앞에서 끊음
 - 80자 또는 5초 초과 → 문장 끝이 안 와도 강제로 끊음 (configurable: `PostProcessConfig`)
+- **강제 끊김 refine** (`refineForcedBreak`): 한도로 끊길 때 BreakRefiner 전략 체인으로 자연스러운 지점 선택 — ① 중앙 근처 쉼표 ② 기능어 꼬리 제거("...of your |" 방지). 끝이 이미 문장부호면 그대로. leftover는 비례 타이밍으로 다음 chunk에 승계. 새 휴리스틱은 `FORCED_BREAK_REFINERS` 배열에만 추가 (merge 루프 무수정)
 - **고아 cue 흡수**: 강제로 끊으면 찌꺼기가 생김 → 25자 미만이면 앞 cue에 붙임
 
 **Gap-aware LEAD** (`postProcessCues`에서 적용)

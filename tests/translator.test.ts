@@ -284,3 +284,58 @@ describe('Injection roundtrip', () => {
     expect(translations[0].textContent).toContain('두 번째 번역');
   });
 });
+
+// ============================================================
+// Replace mode ("가" / Korean-only) visibility invariant
+// ============================================================
+// Regression: on flex/grid blocks the translation is injected into a *descendant*
+// text child. If markOriginalContent marked that child's ancestor as original,
+// `body.b3rys-replace-mode [data-b3rys-original]{display:none}` hid the whole
+// branch — translation and all — so the body content vanished in Korean-only mode.
+
+describe('Replace mode visibility', () => {
+  it('keeps the translation branch un-hidden when injected into a flex text child', () => {
+    setupDOM(
+      '<div style="display:flex;">' +
+        '<span class="icon">•</span>' +
+        '<div class="txt">What is Skilljar and why am I logging into it right now?</div>' +
+        '</div>',
+    );
+    const block = document.querySelector('div[style]') as HTMLElement;
+    const txt = block.querySelector('.txt') as HTMLElement;
+
+    injectTranslation(block, 'Skilljar란 무엇이며 왜 지금 로그인해야 하나요?');
+
+    const translated = block.querySelector(`[${DATA_ATTRS.TRANSLATED}]`) as HTMLElement;
+    // Translation landed inside the text child (a descendant), not directly on block.
+    expect(txt.contains(translated)).toBe(true);
+
+    // Invariant: no ancestor of the translation (up to the block) is marked
+    // original, so replace mode's display:none never reaches it.
+    expect(translated.closest(`[${DATA_ATTRS.ORIGINAL}]`)).toBeNull();
+    // The text child itself is on the path → must stay visible.
+    expect(txt.hasAttribute(DATA_ATTRS.ORIGINAL)).toBe(false);
+    // The original content is still marked somewhere (so replace mode hides it).
+    expect(block.querySelectorAll(`[${DATA_ATTRS.ORIGINAL}]`).length).toBeGreaterThan(0);
+    // The off-path sibling (icon) is hidden.
+    expect(block.querySelector('.icon')!.hasAttribute(DATA_ATTRS.ORIGINAL)).toBe(true);
+  });
+
+  it('restores flex-block original markup after purge', () => {
+    setupDOM(
+      '<div style="display:flex;">' +
+        '<span class="icon">•</span>' +
+        '<div class="txt">Another sufficiently long question about data and privacy here.</div>' +
+        '</div>',
+    );
+    const block = document.querySelector('div[style]') as HTMLElement;
+    const originalHTML = block.innerHTML;
+
+    injectTranslation(block, '데이터와 개인정보에 대한 또 다른 질문');
+    purgeAllTranslations();
+
+    expect(block.querySelector(`[${DATA_ATTRS.TRANSLATED}]`)).toBeNull();
+    expect(block.querySelector(`[${DATA_ATTRS.ORIGINAL}]`)).toBeNull();
+    expect(block.innerHTML).toBe(originalHTML);
+  });
+});
