@@ -52,6 +52,47 @@ describe('GitHub sidebar (Phase 1 — LI detection)', () => {
 });
 
 // ============================================================
+// Fixture: anthropic-news-list (composite cells — date | category | title)
+// ============================================================
+// Regression: rows whose cells concatenate without whitespace were detected as
+// ONE block → "Jul 14, 2026Product Introducing…" → run-on garbage translation.
+
+describe('Anthropic news list (composite-cell rows)', () => {
+  it('detects each cell as its own block — never a merged row', () => {
+    setupDOM(loadFixture('anthropic-news-list'));
+    const blocks = detectTextBlocks(document.body);
+    const texts = blocks.map((b) => b.text);
+
+    expect(texts).toContain('Introducing Claude for Teachers');
+    expect(texts).toContain('Product');
+    expect(texts).toContain('Jul 14, 2026');
+
+    // The glued row/header text must never appear as a single unit
+    for (const t of texts) {
+      expect(t).not.toMatch(/2026Product|2026Announcements|DateCategory/);
+    }
+  });
+
+  it('splits the glued header spans (Date/Category/Title) into separate blocks', () => {
+    setupDOM(loadFixture('anthropic-news-list'));
+    const blocks = detectTextBlocks(document.body);
+    const texts = blocks.map((b) => b.text);
+
+    expect(texts).toContain('Date');
+    expect(texts).toContain('Category');
+    expect(texts).toContain('Title');
+    expect(texts).not.toContain('DateCategoryTitle');
+  });
+
+  it('keeps a normal sentence with inline markup as one block (not composite)', () => {
+    setupDOM('<p>Hello <strong>brave</strong> new <em>world</em> of translation testing.</p>');
+    const blocks = detectTextBlocks(document.body);
+    expect(blocks.length).toBe(1);
+    expect(blocks[0].text).toBe('Hello brave new world of translation testing.');
+  });
+});
+
+// ============================================================
 // Fixture: substack-title
 // ============================================================
 
