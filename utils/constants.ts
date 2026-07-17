@@ -11,6 +11,10 @@ export const ENGINE_MODELS = {
   anthropic: 'claude-haiku-4-5-20251001',
 } as const;
 
+/** Logged at content-script startup so the running bundle can be identified
+ * in DevTools (stale bundles after a rebuild look identical otherwise). */
+export const BUILD_TAG = '0.5.0+scroll.2026-07-17.2';
+
 export const BATCH_SIZE = 15;
 export const VIEWPORT_BATCH_SIZE = 5;
 export const PARALLEL_BATCH_COUNT = 3;

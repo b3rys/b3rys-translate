@@ -233,6 +233,22 @@ describe('TranslationStateMachine', () => {
       expect(sm.state).toBe('error');
     });
 
+    it('empty (no-op) passes never trip the breaker, even on a busy page', async () => {
+      // Productive first pass so the page has translations.
+      deps.hasTranslationsOnPage.mockReturnValue(true);
+      await sm.onFabClick();
+      expect(sm.state).toBe('done');
+
+      // Simulate Gmail-style churn: many observer events, each finding nothing
+      // new to translate ('empty'). This must NOT trip the breaker.
+      deps.translatePage.mockResolvedValue('empty');
+      for (let i = 0; i < 40; i++) {
+        sm.onObserverContent('added');
+        await flushPromises();
+      }
+      expect(sm.state).toBe('done');
+    });
+
     it('FAB click resets circuit breaker', async () => {
       deps.translatePage.mockResolvedValue('done');
 
@@ -261,12 +277,12 @@ describe('TranslationStateMachine', () => {
       expect(deps.translatePage).not.toHaveBeenCalled();
     });
 
-    it('pending restart: observer during loading triggers cancel + restart', async () => {
+    it("pending restart: 'replaced' during loading triggers cancel + full restart", async () => {
       const { promise, resolve } = await startPendingTranslation(sm, deps);
       expect(sm.state).toBe('loading');
 
-      // Observer fires during loading → pending restart
-      sm.onObserverContent();
+      // Detected blocks were removed (SPA navigation) → in-flight work is stale
+      sm.onObserverContent('replaced');
       expect(deps.cancelTranslation).toHaveBeenCalled();
 
       // Second translatePage call (for restart) resolves immediately
@@ -278,7 +294,31 @@ describe('TranslationStateMachine', () => {
 
       // Should have restarted and completed
       expect(sm.state).toBe('done');
-      expect(deps.removeAllTranslations).toHaveBeenCalled();
+      // Restart is incremental: swapped-out nodes took their translations with
+      // them; surviving translations stay (no full page rip-out).
+      expect(deps.removeAllTranslations).not.toHaveBeenCalled();
+      expect(deps.translatePage).toHaveBeenCalledTimes(2);
+    });
+
+    it("'added' during loading does NOT cancel — incremental pass after completion", async () => {
+      const { promise, resolve } = await startPendingTranslation(sm, deps);
+      expect(sm.state).toBe('loading');
+
+      // App chrome churn (e.g. Gmail) while a long page is still translating
+      sm.onObserverContent('added');
+      expect(deps.cancelTranslation).not.toHaveBeenCalled();
+
+      // Incremental follow-up pass resolves immediately
+      deps.translatePage.mockResolvedValueOnce('done');
+
+      // First translation completes normally — injected work is kept
+      resolve('done');
+      await promise;
+
+      expect(sm.state).toBe('done');
+      // The added path must never rip out already-injected translations
+      expect(deps.removeAllTranslations).not.toHaveBeenCalled();
+      // Follow-up incremental pass ran for the content that arrived mid-flight
       expect(deps.translatePage).toHaveBeenCalledTimes(2);
     });
   });

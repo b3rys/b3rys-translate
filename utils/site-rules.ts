@@ -36,6 +36,11 @@ const SITE_RULES: Record<string, SiteRule> = {
     mainContentSelector: '.post-content, .body-SxXE9l, article',
   },
   'mail.google.com': {
+    // Scope detection to the reading pane. Gmail's left nav, chat panel, and
+    // app chrome churn constantly; translating/re-detecting them is wasteful and
+    // (before this) kept firing the observer → tripping the circuit breaker.
+    // Falls through to whole-page detection if no [role="main"] is present.
+    onlyWithin: ['[role="main"]'],
     mainContentSelector: '[role="main"]',
   },
   'skilljar.com': {

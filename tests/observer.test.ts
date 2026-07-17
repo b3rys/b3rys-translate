@@ -117,4 +117,57 @@ describe('observeDynamicContent', () => {
 
     unsubscribe();
   });
+
+  it("reports 'added' for plain content additions", async () => {
+    const callback = vi.fn();
+    const unsubscribe = observeDynamicContent(callback);
+
+    const p = document.createElement('p');
+    p.textContent = 'New paragraph';
+    document.body.appendChild(p);
+
+    await vi.advanceTimersByTimeAsync(DEBOUNCE_DELAY + 50);
+    expect(callback).toHaveBeenCalledWith('added');
+
+    unsubscribe();
+  });
+
+  it("reports 'replaced' when a detected block (BLOCK_ID) is removed", async () => {
+    const container = document.createElement('div');
+    const detected = document.createElement('p');
+    detected.setAttribute('data-b3rys-id', 'b3rys-1');
+    container.appendChild(detected);
+    document.body.appendChild(container);
+
+    const callback = vi.fn();
+    const unsubscribe = observeDynamicContent(callback);
+
+    // SPA navigation: subtree containing a detected block is swapped out
+    container.remove();
+
+    await vi.advanceTimersByTimeAsync(DEBOUNCE_DELAY + 50);
+    expect(callback).toHaveBeenCalledWith('replaced');
+
+    unsubscribe();
+  });
+
+  it("'replaced' outranks 'added' within one debounce window", async () => {
+    const detected = document.createElement('p');
+    detected.setAttribute('data-b3rys-id', 'b3rys-2');
+    document.body.appendChild(detected);
+
+    const callback = vi.fn();
+    const unsubscribe = observeDynamicContent(callback);
+
+    const added = document.createElement('p');
+    added.textContent = 'incoming';
+    document.body.appendChild(added);
+    detected.remove();
+
+    await vi.advanceTimersByTimeAsync(DEBOUNCE_DELAY + 50);
+    expect(callback).toHaveBeenCalledTimes(1);
+    expect(callback).toHaveBeenCalledWith('replaced');
+
+    unsubscribe();
+  });
 });

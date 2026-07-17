@@ -362,12 +362,12 @@ MutationObserver 콜백
 │     (예: recentStarts 배열이 초기화됨)                            │
 │     │                                                           │
 │  2. API 호출이 계속됨                                            │
-│     │  ×1  ×2  ×3  ...  ×50                                     │
+│     │  ×1  ×2  ×3  ...  ×150                                    │
 │     │                    │                                      │
 │  3. [최종] Rate Limiter 발동! ◄─┘                                │
 │     │                                                           │
 │     ├─ 모든 TRANSLATE_BATCH 요청에 에러 응답 반환                 │
-│     ├─ "Rate limit: 50 API calls/min exceeded"                  │
+│     ├─ "Translation paused: 150 API calls/min limit reached"    │
 │     │                                                           │
 │  4. content → 일반 에러 처리 → FAB 에러 표시                      │
 │  5. 번역 중단                                                    │

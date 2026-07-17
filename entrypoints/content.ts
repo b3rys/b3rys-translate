@@ -20,7 +20,7 @@ import {
 } from './content/context-invalidated';
 import type { TranslationMode } from '@/types';
 import type { ContentMessage } from '@/utils/messaging';
-import { SKIP_HOSTS, USAGE_RATIO_KEY } from '@/utils/constants';
+import { SKIP_HOSTS, USAGE_RATIO_KEY, BUILD_TAG } from '@/utils/constants';
 import { TranslationStateMachine } from '@/utils/translation-state';
 
 export default defineContentScript({
@@ -28,6 +28,9 @@ export default defineContentScript({
   runAt: 'document_idle',
 
   main() {
+    // Identify the running bundle — rebuilds without an extension reload +
+    // page refresh keep executing the old content script silently.
+    console.log(`[b3rys] content script ${BUILD_TAG}`);
     // Initialize YouTube dual subtitles if on YouTube
     if (location.hostname === 'www.youtube.com') {
       import('./content/youtube/youtube-controller').then(({ initYouTubeSubtitles }) => {
@@ -214,8 +217,9 @@ export default defineContentScript({
 
     // Observe DOM mutations for SPA content changes (e.g. Substack inbox navigation)
     // Complements URL polling: catches in-page content swaps where URL may not change
-    observeDynamicContent(() => {
-      sm.onObserverContent();
+    // kind: 'added' (content grew) vs 'replaced' (detected blocks removed)
+    observeDynamicContent((kind) => {
+      sm.onObserverContent(kind);
     });
 
     // Auto-translate on page load is disabled — default is always OFF.
