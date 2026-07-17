@@ -5,6 +5,7 @@ import {
   postProcessCues,
   mergeCues,
   mergeCuesTwoLine,
+  refineForcedBreak,
   TRAILING_FUNC_WORDS,
 } from '@/entrypoints/content/youtube/cue-merger';
 import type { SubtitleCue } from '@/types';
@@ -24,9 +25,16 @@ describe('TRAILING_FUNC_WORDS', () => {
 
 describe('stripTrailingFuncWords', () => {
   it('strips trailing "the" from end', () => {
-    const { flush, leftover } = stripTrailingFuncWords('learn about the', 5);
-    expect(flush).toBe('learn about');
+    const { flush, leftover } = stripTrailingFuncWords('learn together the', 5);
+    expect(flush).toBe('learn together');
     expect(leftover).toBe('the');
+  });
+
+  it('strips a trailing preposition chain ("about the")', () => {
+    // "about" needs an object — ending on it reads as badly as ending on "the"
+    const { flush, leftover } = stripTrailingFuncWords('learn about the', 5);
+    expect(flush).toBe('learn');
+    expect(leftover).toBe('about the');
   });
 
   it('strips multiple trailing function words', () => {
@@ -172,6 +180,68 @@ describe('mergeCues', () => {
     for (const cue of result) {
       expect(cue.text.length).toBeLessThan(100);
     }
+  });
+
+  it('does not end a limit-forced chunk on a trailing function word', () => {
+    const cues: SubtitleCue[] = [
+      { start: 0, duration: 2, text: 'we always recommend bringing extra' },
+      { start: 2, duration: 1, text: 'printed copies of your' },
+      { start: 3, duration: 2, text: 'resume before every interview session' },
+    ];
+    const result = mergeCues(cues);
+    // Forced flush would raw-cut at "...copies of your |" — refinement moves
+    // the dependent words into the next chunk.
+    expect(result[0].text).toBe('we always recommend bringing extra printed copies');
+    expect(result[1].text).toContain('of your resume');
+  });
+
+  it('prefers a comma break when a limit-forced flush happens', () => {
+    const cues: SubtitleCue[] = [
+      { start: 0, duration: 2, text: 'when you finally walk into the interview room,' },
+      { start: 2, duration: 1, text: 'please bring several printed copies' },
+      { start: 3, duration: 2, text: 'along with a fully charged laptop for notes' },
+    ];
+    const result = mergeCues(cues);
+    expect(result[0].text).toBe('when you finally walk into the interview room,');
+    expect(result[1].text).toContain('please bring several printed copies');
+  });
+});
+
+describe('refineForcedBreak', () => {
+  it('keeps text ending in punctuation unchanged (already natural)', () => {
+    const { flush, leftover } = refineForcedBreak('a clause that ends with a comma,', {
+      minFlush: 10,
+      minLeftover: 5,
+    });
+    expect(flush).toBe('a clause that ends with a comma,');
+    expect(leftover).toBe('');
+  });
+
+  it('breaks at the comma nearest the middle', () => {
+    const { flush, leftover } = refineForcedBreak(
+      'after the meeting ended, everyone went home to rest',
+      { minFlush: 10, minLeftover: 5 },
+    );
+    expect(flush).toBe('after the meeting ended,');
+    expect(leftover).toBe('everyone went home to rest');
+  });
+
+  it('falls back to function-word stripping when no comma qualifies', () => {
+    const { flush, leftover } = refineForcedBreak('the interviewer asked about the', {
+      minFlush: 10,
+      minLeftover: 2,
+    });
+    expect(flush).toBe('the interviewer asked');
+    expect(leftover).toBe('about the');
+  });
+
+  it('returns text as-is when no refiner has a proposal', () => {
+    const { flush, leftover } = refineForcedBreak('short plain words here', {
+      minFlush: 20,
+      minLeftover: 10,
+    });
+    expect(flush).toBe('short plain words here');
+    expect(leftover).toBe('');
   });
 });
 
