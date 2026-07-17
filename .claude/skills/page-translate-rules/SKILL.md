@@ -35,7 +35,7 @@ detectTextBlocks()
 **Phase 1: 시맨틱 블록 감지**
 
 - `TRANSLATABLE_TAGS` (P, H1-H6, LI, TD, TH, BLOCKQUOTE 등) 매칭
-- `getDirectText()`: 재귀적으로 SKIP_TAGS/TRANSLATABLE_TAGS/TEXT_BOUNDARY_TAGS 자식 제외, inline 텍스트만 수집
+- `getDirectText()`: 재귀적으로 boundary 자식(SKIP_TAGS/TRANSLATABLE_TAGS/TEXT_BOUNDARY_TAGS/**composite-cell 컨테이너**) 제외, inline 텍스트만 수집 (`isTextCollectionBoundary()`)
 - `getDirectHTML()`: inline 마크업 보존 (a, code, strong 등), block/SKIP_TAGS/TEXT_BOUNDARY_TAGS 자식은 제외. `cleanForAPI()`로 비필수 속성(id, class, `data-*`, `aria-*`) 제거 → 깔끔한 HTML만 API에 전송
 - `TEXT_BOUNDARY_TAGS`: BUTTON, FORM, DIALOG, DETAILS, TEMPLATE, NAV — TreeWalker는 진입하지만 `getDirectText`/`getDirectHTML`은 재귀하지 않음 (SKIP_TAGS와 다름)
 - `filterAncestorBlocks()`: 자식 블록이 있는 부모 블록 제거 (중복 번역 방지)
@@ -43,9 +43,10 @@ detectTextBlocks()
 **Phase 2: 텍스트 컨테이너 감지**
 
 - Phase 1에서 못 잡는 nav 메뉴, 사이드바, 바이오 텍스트, 독립 링크 제목 감지
-- DIV, SPAN, A 중:
+- DIV, SPAN, A, BUTTON, TIME 중:
   - `children.length === 0` (리프 요소), 또는
-  - `hasOnlyInlineChildren()` — 재귀적 검사 (자식 + 손자까지 모두 인라인 태그: A, SPAN, STRONG, EM 등. 카드 wrapping `<a>` 내부에 DIV가 있으면 거부)
+  - `hasOnlyInlineChildren()` — 재귀적 검사 (자식 + 손자까지 모두 인라인 태그: A, SPAN, STRONG, EM 등. 카드 wrapping `<a>` 내부에 DIV가 있으면 거부) **AND** `!isCompositeCells()`
+- **`isCompositeCells()` — 복합 셀 컨테이너 분해** (anthropic.com/news 회귀): 텍스트 가진 자식 ≥2 + 컨테이너 직속 loose 텍스트 없음 + 인접 자식 텍스트가 **공백 없이 글루**되면(예: `<span>Date</span><span>Category</span>` → "DateCategory") 한 단위로 수락하지 않고 SKIP → 하강해서 각 셀을 개별 감지. Phase 1 `getDirectText`/`getDirectHTML`도 동일 술어로 composite 자식을 경계 처리 (LI가 행 전체를 흡수하는 경로 차단). 레이아웃 읽기 없음 — 순수 DOM 판정이라 happy-dom 테스트 가능
 - Phase 1에서 이미 감지된 요소(`DATA_ATTRS.BLOCK_ID`)는 REJECT (중복 방지)
 - **조상 중복 제거**: 부모가 이미 Phase 2에서 감지된 경우 자식은 제외 (`parentElement.closest([BLOCK_ID])`)
 - HTML은 `textContent`(순수 텍스트)로 전송 — innerHTML 사용 안 함 (SVG 등 안전성)
@@ -77,13 +78,13 @@ detectTextBlocks()
 
 ## Site Rules (site-rules.ts) — 사이트별 감지 제어
 
-| 속성                 | 동작                                                                            | 사용 예                                   |
-| -------------------- | ------------------------------------------------------------------------------- | ----------------------------------------- |
-| `skipSelectors`      | 매칭 요소 + 자손 전부 REJECT (blacklist)                                        | Skilljar: `.clp__enroll-btn`, `header`    |
-| `onlyWithin`         | 매칭 컨테이너 안에서만 Phase 1+2 실행 (whitelist). 컨테이너 없으면 fall through | GitHub: `.markdown-body`, `.comment-body` |
-| `translateSelectors` | Phase 1+2 대체. 매칭 요소만 감지                                                | Gmail: `[role="main"]` 내부               |
-| `injectAsSibling`    | 인라인 요소에 번역을 형제로 주입                                                | Substack                                  |
-| `forceReplace`       | translateSelectors와 함께 사용, 원문 교체                                       | —                                         |
+| 속성                 | 동작                                                                            | 사용 예                                                                                                                      |
+| -------------------- | ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `skipSelectors`      | 매칭 요소 + 자손 전부 REJECT (blacklist)                                        | Skilljar: `.clp__enroll-btn`, `header`                                                                                       |
+| `onlyWithin`         | 매칭 컨테이너 안에서만 Phase 1+2 실행 (whitelist). 컨테이너 없으면 fall through | GitHub: `.markdown-body`; **Gmail: `[role="main"]`** (좌측 nav·챗 chrome churn 감지 제외 → circuit breaker 오작동·느림 방지) |
+| `translateSelectors` | Phase 1+2 대체. 매칭 요소만 감지                                                | Gmail: `[role="main"]` 내부                                                                                                  |
+| `injectAsSibling`    | 인라인 요소에 번역을 형제로 주입                                                | Substack                                                                                                                     |
+| `forceReplace`       | translateSelectors와 함께 사용, 원문 교체                                       | —                                                                                                                            |
 
 **`onlyWithin` + `skipSelectors` 조합 (GitHub 패턴):**
 
@@ -169,13 +170,16 @@ detectTextBlocks()
 
 ## 배치 전략
 
+- **Phase 0 — 캐시 선주입** (`injectCachedTranslations`): 배칭 전에 `CACHE_LOOKUP` 메시지(순수 캐시 읽기 — API·rate limit·통계 없음)로 전체 블록을 한 번에 조회, hit은 즉시 주입하고 **miss만** 아래 배치 단계로 진입. 재방문 페이지가 즉시 렌더되는 이유. lookup 실패는 non-fatal (전량 일반 경로 폴백)
 - **Viewport-first**: 화면에 보이는 블록 먼저 번역 (`VIEWPORT_BATCH_SIZE = 5`)
 - **Parallel batching**: 나머지는 `BATCH_SIZE = 15`씩, `PARALLEL_BATCH_COUNT = 3`개 동시 처리
 - **거리순 정렬**: viewport 밖 블록은 거리순으로 번역
+- **drift 보정 공용화**: 모든 DOM 변이(로더 in/out·주입·에러·숨김)는 `withScrollCompensation(scroller, mutate)` 하나로 통일. scroller는 배치 요소에서 `getScrollContainer()`로 도출, 앵커는 `findContentAnchor()`가 스크롤러 내부를 탐침 (상세 규칙: safety-rules 스킬의 "스크롤 drift 보정")
 
 ## 번역 캐시 (background.ts + translation-cache.ts)
 
 - LRU 캐시, `chrome.storage.local`에 영속 저장
 - TTL: 7일, 최대 1000개 엔트리
-- API 호출 전 캐시 조회 → 히트 시 즉시 반환, 미스만 Gemini 호출
+- API 호출 전 캐시 조회 → 히트 시 즉시 반환, 미스만 엔진 호출
+- 캐시 키 prefix는 `cacheKeyPrefix(targetLang, mode)` 단일 소스 — `CACHE_LOOKUP`과 `TRANSLATE_BATCH`가 공유 (어긋나면 선주입이 무력화되므로 반드시 이 함수만 사용)
 - 캐시 클리어: 서비스워커 콘솔에서 `chrome.storage.local.remove('b3rys_translation_cache')`

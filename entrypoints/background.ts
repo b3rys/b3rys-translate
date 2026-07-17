@@ -4,6 +4,7 @@ import type { UsageData } from '@/utils/engines/types';
 import type {
   BackgroundMessage,
   TranslateBatchResponse,
+  CacheLookupResponse,
   ClearCacheResponse,
 } from '@/utils/messaging';
 import {
@@ -35,7 +36,13 @@ type UsageStats = Partial<Record<EngineType, EngineUsageStats>>;
 
 // Rate limiter: prevent excessive API calls from any source (cost protection)
 const RATE_WINDOW = 60_000; // 1 minute
-const RATE_MAX_CALLS = 50; // max API calls per window (cache hits don't count)
+// Cost backstop for a genuine runaway loop. Each call is a *batch* (up to
+// BATCH_SIZE paragraphs / SUBTITLE_BATCH_SIZE cues), and this counter is global
+// across every tab + YouTube rolling translation, so it must sit well above
+// legitimate heavy use (long pages, multi-tab, a talky video). The real
+// runaway-loop guard is content.ts's circuit breaker (15 starts/min); this is
+// only the last-resort cost cap.
+const RATE_MAX_CALLS = 150; // max API calls per window (cache hits don't count)
 const recentApiCalls: number[] = [];
 
 function checkRateLimit(): string | null {
@@ -44,7 +51,7 @@ function checkRateLimit(): string | null {
     recentApiCalls.shift();
   }
   if (recentApiCalls.length >= RATE_MAX_CALLS) {
-    return `Rate limit: ${RATE_MAX_CALLS} API calls/min exceeded. Possible runaway loop detected. Reload the page to reset.`;
+    return `Translation paused: ${RATE_MAX_CALLS} API calls/min limit reached. Wait a moment or reload the page to resume.`;
   }
   recentApiCalls.push(now);
   return null;
@@ -58,7 +65,9 @@ export default defineBackground(() => {
     (
       message: BackgroundMessage,
       _sender: chrome.runtime.MessageSender,
-      sendResponse: (response: TranslateBatchResponse | ClearCacheResponse) => void,
+      sendResponse: (
+        response: TranslateBatchResponse | CacheLookupResponse | ClearCacheResponse,
+      ) => void,
     ) => {
       if (message.type === 'OPEN_POPUP') {
         chrome.action.openPopup().catch(() => {
@@ -71,6 +80,13 @@ export default defineBackground(() => {
         clearCache()
           .then(() => sendResponse({ success: true }))
           .catch(() => sendResponse({ success: false }));
+        return true;
+      }
+
+      if (message.type === 'CACHE_LOOKUP') {
+        handleCacheLookup(message.paragraphs, message.targetLang)
+          .then(sendResponse)
+          .catch(() => sendResponse({ translations: [] }));
         return true;
       }
 
@@ -140,6 +156,38 @@ async function updateUsageRatio(stats: UsageStats): Promise<void> {
   await chrome.storage.sync.set({ [USAGE_RATIO_KEY]: ratio });
 }
 
+/** Resolve the effective target language: message override > storage > default. */
+async function resolveTargetLang(msgTargetLang?: string): Promise<string> {
+  if (msgTargetLang) return msgTargetLang;
+  const langData = await chrome.storage.sync.get(LANG_STORAGE_KEY);
+  const stored = langData[LANG_STORAGE_KEY] as { target?: string } | undefined;
+  return stored?.target || DEFAULT_TARGET_LANG;
+}
+
+/** Cache key prefix — single source of truth for lookup and store paths. */
+function cacheKeyPrefix(targetLang: string, mode?: 'page' | 'subtitle' | 'word' | 'segment') {
+  return `${targetLang}:${mode === 'word' ? 'w:' : ''}`;
+}
+
+/**
+ * Pure cache read — no API call, no rate-limit slot, no usage stats.
+ * Returns only the hits; the content script paints them instantly and
+ * sends the misses through the normal TRANSLATE_BATCH path.
+ */
+async function handleCacheLookup(
+  paragraphs: { id: string; text: string }[],
+  msgTargetLang?: string,
+): Promise<CacheLookupResponse> {
+  await loadCache();
+  const prefix = cacheKeyPrefix(await resolveTargetLang(msgTargetLang), 'page');
+  const translations: { id: string; translatedText: string }[] = [];
+  for (const p of paragraphs) {
+    const hit = getCached(prefix + p.text);
+    if (hit !== null) translations.push({ id: p.id, translatedText: hit });
+  }
+  return { translations };
+}
+
 async function handleTranslateBatch(
   paragraphs: { id: string; text: string }[],
   mode?: 'page' | 'subtitle' | 'word' | 'segment',
@@ -156,12 +204,7 @@ async function handleTranslateBatch(
 
   // Resolve language pair: message override > storage > defaults
   // Source language is auto-detected by LLM — only target language is configurable
-  let targetLang = msgTargetLang;
-  if (!targetLang) {
-    const langData = await chrome.storage.sync.get(LANG_STORAGE_KEY);
-    const stored = langData[LANG_STORAGE_KEY] as { target?: string } | undefined;
-    targetLang = stored?.target || DEFAULT_TARGET_LANG;
-  }
+  const targetLang = await resolveTargetLang(msgTargetLang);
   const sourceLang = msgSourceLang || DEFAULT_SOURCE_LANG;
   const lang = { sourceLang, targetLang };
 
@@ -226,7 +269,7 @@ async function handleTranslateBatch(
   await loadCache();
 
   // Check cache for each paragraph (include target lang + mode in cache key)
-  const cachePrefix = `${targetLang}:${mode === 'word' ? 'w:' : ''}`;
+  const cachePrefix = cacheKeyPrefix(targetLang, mode);
   const cached: { id: string; translatedText: string }[] = [];
   const uncached: { id: string; text: string }[] = [];
 
