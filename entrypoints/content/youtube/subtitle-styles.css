@@ -19,7 +19,7 @@
   border-radius: 4px;
   font-family: 'YouTube Noto', Roboto, Arial, sans-serif;
   /* Fallback size only — the effective size is injected from JS (player-relative). */
-  font-size: clamp(15px, 1.6vw, 30px);
+  font-size: clamp(16px, 1.8vw, 34px);
   line-height: 1.4;
   /* Always a single line — never wrap, and never clip the tail with an ellipsis. */
   white-space: nowrap;

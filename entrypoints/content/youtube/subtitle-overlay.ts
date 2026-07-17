@@ -253,7 +253,7 @@ function updateFontSize(): void {
   const player = document.getElementById('movie_player');
   const style = document.getElementById(FONT_STYLE_ID);
   if (!player || !style) return;
-  const px = Math.round(Math.min(34, Math.max(15, player.clientWidth * 0.02)));
+  const px = Math.round(Math.min(38, Math.max(16, player.clientWidth * 0.023)));
   style.textContent = `.b3rys-subtitle-line { font-size: ${px}px !important; }`;
 }
 
