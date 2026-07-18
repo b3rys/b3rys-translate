@@ -105,6 +105,7 @@ utils/
 - **코드 수정 후 반드시 `npm run build` 실행** — 사용자가 `npm run dev`를 항상 켜두지 않으므로, 코드 변경 후에는 `npm run build`로 dist를 갱신해야 함
 - 테스트 검증 순서: `npm run test` → `npm run lint` → `npm run build`
 - build 실패 시 사용자에게 테스트 요청하지 말 것
+- **배포(GitHub Release·웹스토어) 전 [docs/release-checklist.md](docs/release-checklist.md) 인수테스트 필수 통과** — 자동 테스트는 이를 대체하지 못한다. 속도/구조 개선이 기본 기능을 깨면 개선을 롤백한다 (기능 우선)
 
 ## 기능별 상세 룰 (스킬)
 
