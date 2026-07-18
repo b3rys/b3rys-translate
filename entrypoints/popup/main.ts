@@ -282,14 +282,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       const response = await chrome.runtime.sendMessage({ type: 'CLEAR_CACHE' });
       if (response?.success) {
-        cacheStatus.textContent = '캐시가 초기화되었습니다';
+        cacheStatus.textContent = 'Cache cleared';
         cacheStatus.className = 'cache-status success';
       } else {
-        cacheStatus.textContent = '초기화 실패';
+        cacheStatus.textContent = 'Failed to clear';
         cacheStatus.className = 'cache-status error';
       }
     } catch {
-      cacheStatus.textContent = '초기화 실패';
+      cacheStatus.textContent = 'Failed to clear';
       cacheStatus.className = 'cache-status error';
     }
     cacheClearBtn.disabled = false;

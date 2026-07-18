@@ -46,14 +46,14 @@
             id="engine-info"
             tabindex="0"
             role="button"
-            aria-label="엔진 비교 설명"
+            aria-label="Engine comparison"
           >
             <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
               <circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.3" />
               <path d="M8 7v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
               <circle cx="8" cy="4.75" r="0.9" fill="currentColor" />
             </svg>
-            <span class="info-trigger-text">설명</span>
+            <span class="info-trigger-text">info</span>
             <span class="info-tooltip" id="engine-tooltip" role="tooltip"></span>
           </span>
         </label>
@@ -65,7 +65,7 @@
         <label class="label" for="api-key">
           <span class="label-text">API Key</span>
           <a id="key-issue-link" class="key-issue-link" href="#" target="_blank" rel="noopener"
-            >키 발급 ↗</a
+            >Get key ↗</a
           >
           <span id="key-status" class="status"></span>
         </label>
@@ -141,8 +141,31 @@
       </section>
 
       <!-- Cost Section -->
-      <section class="section">
-        <label class="label"><span class="label-text">Cost</span></label>
+      <section class="section section-cost">
+        <label class="label">
+          <span class="label-text">Cost</span>
+          <span
+            class="info-trigger"
+            id="cost-info"
+            tabindex="0"
+            role="button"
+            aria-label="Cost estimate info"
+          >
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.3" />
+              <path d="M8 7v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+              <circle cx="8" cy="4.75" r="0.9" fill="currentColor" />
+            </svg>
+            <span class="info-trigger-text">info</span>
+            <span class="info-tooltip info-tooltip-note" role="tooltip">
+              <span class="info-tooltip-title">비용 추정 · 실제 청구액 아님</span>
+              <span class="tt-desc"
+                >번역에 사용한 토큰량으로 계산한 <strong>대략적인 API 비용 추정치</strong>입니다.
+                정확한 청구 금액은 각 엔진 제공사의 대시보드에서 확인하세요.</span
+              >
+            </span>
+          </span>
+        </label>
         <div class="cost-row" id="cost-row">
           <div class="cost-gauge" id="cost-gauge"></div>
           <div class="cost-inline">
@@ -162,7 +185,7 @@
             <span id="limit-status" class="limit-status"></span>
           </div>
           <div class="cost-actions">
-            <button id="cost-detail-toggle" class="btn-icon-sm" title="상세보기">
+            <button id="cost-detail-toggle" class="btn-icon-sm" title="Details">
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                 <path
                   d="M4 6l4 4 4-4"
@@ -173,7 +196,7 @@
                 />
               </svg>
             </button>
-            <button id="cost-reset" class="btn-icon-sm btn-icon-danger" title="초기화">
+            <button id="cost-reset" class="btn-icon-sm btn-icon-danger" title="Reset">
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                 <path
                   d="M2 8a6 6 0 0111.46-2.46M14 8a6 6 0 01-11.46 2.46"
@@ -214,10 +237,10 @@
       <section class="section">
         <div class="cache-row">
           <div class="cache-info">
-            <span class="label-text">번역 캐시</span>
-            <span class="cache-hint">초기화 시 모든 번역이 다시 요청됩니다</span>
+            <span class="label-text">Cache</span>
+            <span class="cache-hint">Clearing re-requests all translations</span>
           </div>
-          <button id="cache-clear" class="btn-cache-clear">초기화</button>
+          <button id="cache-clear" class="btn-cache-clear">Clear</button>
         </div>
         <span id="cache-status" class="cache-status"></span>
       </section>
