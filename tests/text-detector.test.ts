@@ -84,6 +84,27 @@ describe('Anthropic news list (composite-cell rows)', () => {
     expect(texts).not.toContain('DateCategoryTitle');
   });
 
+  it('splits block-level title/desc card cells even WITH whitespace between them (claude.com TOC)', () => {
+    // Real ck-toc markup has newlines between the divs — the glue signal alone
+    // missed it, so LI merged title+desc into one run-on translation unit.
+    setupDOM(
+      '<li><a href="#pulse">' +
+        '<div class="ck-toc-icon"><svg viewBox="0 0 24 24"></svg></div>' +
+        '<div>\n  <div class="ck-toc-title">Get a pulse on your business</div>\n  ' +
+        '<div class="ck-toc-desc">One Monday-morning page that covers what you would check.</div>\n</div>' +
+        '</a></li>',
+    );
+    const blocks = detectTextBlocks(document.body);
+    const texts = blocks.map((b) => b.text);
+
+    expect(texts).toContain('Get a pulse on your business');
+    expect(texts).toContain('One Monday-morning page that covers what you would check.');
+    // Never merged into a single run-on unit
+    for (const t of texts) {
+      expect(t).not.toMatch(/business[\s\S]*One Monday/);
+    }
+  });
+
   it('keeps a normal sentence with inline markup as one block (not composite)', () => {
     setupDOM('<p>Hello <strong>brave</strong> new <em>world</em> of translation testing.</p>');
     const blocks = detectTextBlocks(document.body);

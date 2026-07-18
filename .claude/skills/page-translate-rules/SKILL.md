@@ -46,7 +46,7 @@ detectTextBlocks()
 - DIV, SPAN, A, BUTTON, TIME 중:
   - `children.length === 0` (리프 요소), 또는
   - `hasOnlyInlineChildren()` — 재귀적 검사 (자식 + 손자까지 모두 인라인 태그: A, SPAN, STRONG, EM 등. 카드 wrapping `<a>` 내부에 DIV가 있으면 거부) **AND** `!isCompositeCells()`
-- **`isCompositeCells()` — 복합 셀 컨테이너 분해** (anthropic.com/news 회귀): 텍스트 가진 자식 ≥2 + 컨테이너 직속 loose 텍스트 없음 + 인접 자식 텍스트가 **공백 없이 글루**되면(예: `<span>Date</span><span>Category</span>` → "DateCategory") 한 단위로 수락하지 않고 SKIP → 하강해서 각 셀을 개별 감지. Phase 1 `getDirectText`/`getDirectHTML`도 동일 술어로 composite 자식을 경계 처리 (LI가 행 전체를 흡수하는 경로 차단). 레이아웃 읽기 없음 — 순수 DOM 판정이라 happy-dom 테스트 가능
+- **`isCompositeCells()` — 복합 셀 컨테이너 분해**: 텍스트 가진 자식 ≥2 + 직속 loose 텍스트 없음일 때 두 신호 중 하나면 셀 분해 — ①**글루**(인접 자식 텍스트가 공백 없이 접합, anthropic.com/news `DateCategory`) ②**블록 셀**(인접 두 자식이 DIV/SECTION 등 `BLOCK_CELL_TAGS` — 카드의 title/desc div 쌍, claude.com TOC run-on 회귀). 한 단위로 수락하지 않고 SKIP → 하강해서 각 셀 개별 감지. Phase 1 `getDirectText`/`getDirectHTML`도 동일 술어로 composite 자식을 경계 처리 (LI가 행 전체를 흡수하는 경로 차단). 레이아웃 읽기 없음 — 순수 DOM 판정이라 happy-dom 테스트 가능
 - Phase 1에서 이미 감지된 요소(`DATA_ATTRS.BLOCK_ID`)는 REJECT (중복 방지)
 - **조상 중복 제거**: 부모가 이미 Phase 2에서 감지된 경우 자식은 제외 (`parentElement.closest([BLOCK_ID])`)
 - HTML은 `textContent`(순수 텍스트)로 전송 — innerHTML 사용 안 함 (SVG 등 안전성)

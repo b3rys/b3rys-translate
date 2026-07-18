@@ -7,6 +7,7 @@
 import type { FloatingButtonState, TranslationMode } from '@/types';
 import type { TranslationResult } from '@/entrypoints/content/translator';
 import { checkCircuitBreaker } from './circuit-breaker';
+import { dbg } from './debug';
 
 const CIRCUIT_WINDOW = 60_000; // 1 minute
 // Max *productive* translation starts per window. Auto-translate legitimately
@@ -85,6 +86,7 @@ export class TranslationStateMachine {
   }
 
   onObserverContent(kind: ContentChangeKind = 'added'): void {
+    dbg('observer %s; state=%s', kind, this._state);
     if (this._state === 'done') {
       // Incremental: translate only new blocks (existing BLOCK_IDs preserved)
       void this.startTranslation().catch(() => {});
@@ -155,6 +157,7 @@ export class TranslationStateMachine {
     }
 
     const myGen = ++this.startGen;
+    dbg('pass start gen=%d', myGen);
     this.setState('loading');
     this.deps.onProgress(0);
     this.deps.setTranslationMode(this._mode);
@@ -165,6 +168,7 @@ export class TranslationStateMachine {
         if (myGen !== this.startGen) return; // stale progress callback
         this.deps.onProgress(completed / total);
       });
+      dbg('pass result=%s gen=%d (cur=%d)', result, myGen, this.startGen);
       // A newer startTranslation() (or cancel) superseded us — don't touch state
       if (myGen !== this.startGen) return;
 
@@ -193,10 +197,18 @@ export class TranslationStateMachine {
       }
 
       if (result === 'empty') {
-        // No-op pass: settle by what's already on the page, and do NOT recurse
-        // on pendingRestart — there was nothing new, so it would only spin.
-        this.pendingRestart = false;
         this.deps.onProgress(0);
+        // pendingRestart means content arrived AFTER this pass took its
+        // detection snapshot — "this pass found nothing" does NOT mean
+        // "nothing is waiting". Discarding it here stranded late-arriving
+        // content (virtualized lists) untranslated forever. One follow-up
+        // pass; the flag is consumed first, so a truly empty DOM settles.
+        if (this.pendingRestart) {
+          this.pendingRestart = false;
+          this.setState(this.deps.hasTranslationsOnPage() ? 'done' : 'idle');
+          await this.startTranslation();
+          return;
+        }
         if (this.deps.hasTranslationsOnPage()) {
           this.setState('done');
         } else {

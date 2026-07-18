@@ -34,8 +34,8 @@ function createMockDeps(): MockDeps {
 async function startPendingTranslation(
   sm: TranslationStateMachine,
   deps: MockDeps,
-): Promise<{ promise: Promise<void>; resolve: (v: 'done' | 'cancelled') => void }> {
-  let resolve!: (v: 'done' | 'cancelled') => void;
+): Promise<{ promise: Promise<void>; resolve: (v: 'done' | 'cancelled' | 'empty') => void }> {
+  let resolve!: (v: 'done' | 'cancelled' | 'empty') => void;
   deps.translatePage.mockImplementationOnce(() => new Promise((r) => (resolve = r)));
   const promise = sm.onFabClick();
   // Flush microtasks so checkApiKey + persistEnabled resolve → state reaches 'loading'
@@ -298,6 +298,25 @@ describe('TranslationStateMachine', () => {
       // them; surviving translations stay (no full page rip-out).
       expect(deps.removeAllTranslations).not.toHaveBeenCalled();
       expect(deps.translatePage).toHaveBeenCalledTimes(2);
+    });
+
+    it("'empty' result still honors pendingRestart — late-arriving content gets a follow-up pass", async () => {
+      const { promise, resolve } = await startPendingTranslation(sm, deps);
+      expect(sm.state).toBe('loading');
+
+      // Content arrives AFTER this pass took its detection snapshot
+      sm.onObserverContent('added');
+
+      // Follow-up pass finds the late content
+      deps.translatePage.mockResolvedValueOnce('done');
+
+      // This pass itself saw nothing (snapshot was taken before the content)
+      resolve('empty');
+      await promise;
+
+      // GAP-A regression: 'empty' used to discard pendingRestart → stranded
+      expect(deps.translatePage).toHaveBeenCalledTimes(2);
+      expect(sm.state).toBe('done');
     });
 
     it("'added' during loading does NOT cancel — incremental pass after completion", async () => {

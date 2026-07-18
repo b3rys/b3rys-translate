@@ -22,6 +22,7 @@ import type { TranslationMode } from '@/types';
 import type { ContentMessage } from '@/utils/messaging';
 import { SKIP_HOSTS, USAGE_RATIO_KEY, BUILD_TAG } from '@/utils/constants';
 import { TranslationStateMachine } from '@/utils/translation-state';
+import { dbg } from '@/utils/debug';
 
 /** Does the currently-selected engine have an API key saved? (no side effects) */
 async function hasApiKeyStored(): Promise<boolean> {
@@ -113,6 +114,7 @@ export default defineContentScript({
     });
 
     fab = createFloatingButton(async () => {
+      dbg('FAB click; state=%s invalidated=%s', sm.state, isMarkedInvalidated());
       if (isMarkedInvalidated()) {
         fab.showToast('새로고침하세요.');
         return;

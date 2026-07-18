@@ -89,7 +89,11 @@ export const YT_TRANSLATED_ATTR = 'data-b3rys-subtitle-translated';
 export const YT_TRANSLATION_CLASS = 'b3rys-subtitle-translation';
 
 // Translation cache constants
-export const CACHE_MAX_ENTRIES = 1000;
+// 4000 entries ≈ 1–2MB — big pages alone can be 500+ blocks (claude.com
+// tutorials = 514) and YouTube adds hundreds of cues, so 1000 caused constant
+// LRU eviction churn: the largest page's entries were pushed out between
+// toggles and re-translated (paid) every time.
+export const CACHE_MAX_ENTRIES = 4000;
 export const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 export const CACHE_STORAGE_KEY = 'b3rys_translation_cache';
 

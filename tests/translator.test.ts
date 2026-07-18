@@ -5,8 +5,10 @@ import {
   injectTranslation,
   findTextLabel,
   purgeAllTranslations,
+  cancelTranslation,
   setTranslationMode,
 } from '@/entrypoints/content/translator';
+import { recordInjection, isFighting, resetFightGuard } from '@/utils/fight-guard';
 import { DATA_ATTRS } from '@/utils/constants';
 
 function loadFixture(name: string): string {
@@ -213,18 +215,39 @@ describe('Injection roundtrip', () => {
     expect(p.innerHTML).toBe(originalHTML);
   });
 
-  it('wraps text nodes with <span data-b3rys-original>', () => {
+  it('does NOT re-parent text nodes at injection time (React safety)', () => {
+    // Wrapping framework-owned text nodes breaks React reconciliation
+    // (insertBefore NotFoundError → whole site crashes). Parallel mode must
+    // never move site text nodes.
     setupDOM('<p>Plain text node content here.</p>');
     const p = document.querySelector('p')!;
 
     injectTranslation(p, '번역된 텍스트');
 
-    const originals = p.querySelectorAll(`[${DATA_ATTRS.ORIGINAL}]`);
-    expect(originals.length).toBeGreaterThan(0);
-    // Text node should be wrapped in a span
-    const wrapper = originals[0] as HTMLElement;
-    expect(wrapper.tagName).toBe('SPAN');
-    expect(wrapper.textContent).toContain('Plain text node');
+    // The loose text node stays a direct child of <p> — no wrapper spans
+    const directText = Array.from(p.childNodes).some(
+      (n) => n.nodeType === Node.TEXT_NODE && (n.textContent ?? '').includes('Plain text node'),
+    );
+    expect(directText).toBe(true);
+  });
+
+  it('wraps loose text only when entering replace mode, unwraps on parallel', () => {
+    setupDOM('<p data-b3rys-id="b3rys-950">Plain text node content here.</p>');
+    const p = document.querySelector('p')!;
+    injectTranslation(p, '번역된 텍스트');
+
+    setTranslationMode('replace');
+    const wrapped = p.querySelectorAll(`span[${DATA_ATTRS.ORIGINAL}]`);
+    expect(wrapped.length).toBeGreaterThan(0);
+    expect(wrapped[0].textContent).toContain('Plain text node');
+
+    setTranslationMode('parallel');
+    // Wrappers are gone; the text node is a direct child again
+    expect(p.querySelectorAll(`span[${DATA_ATTRS.ORIGINAL}]`).length).toBe(0);
+    const directText = Array.from(p.childNodes).some(
+      (n) => n.nodeType === Node.TEXT_NODE && (n.textContent ?? '').includes('Plain text node'),
+    );
+    expect(directText).toBe(true);
   });
 
   it('marks inline element children with attribute only (no wrapping)', () => {
@@ -337,5 +360,118 @@ describe('Replace mode visibility', () => {
     expect(block.querySelector(`[${DATA_ATTRS.TRANSLATED}]`)).toBeNull();
     expect(block.querySelector(`[${DATA_ATTRS.ORIGINAL}]`)).toBeNull();
     expect(block.innerHTML).toBe(originalHTML);
+  });
+});
+
+// ============================================================
+// Card-style sole-link injection (claude.com TOC regression)
+// ============================================================
+// The <a> is a grid: icon column + text column. Appending the translation span
+// directly to the <a> made it a NEW grid item in the ~22px icon track →
+// one-character-per-line vertical text. It must land inside the text column.
+
+describe('Sole-link card injection', () => {
+  it('injects inside the link text column, never as a direct <a> grid item', () => {
+    // Non-semantic wrapper (DIV) → sole-link path applies. Semantic tags (LI)
+    // keep their own default injection by design.
+    setupDOM(
+      '<div class="card"><a href="#pulse">' +
+        '<div class="icon"><svg viewBox="0 0 24 24"></svg></div>' +
+        '<div><div class="t">Get a pulse on your business</div>' +
+        '<div class="d">One Monday-morning page that covers what you would check across tabs.</div></div>' +
+        '</a></div>',
+    );
+    const card = document.querySelector('.card') as HTMLElement;
+    injectTranslation(card, '비즈니스 현황 파악하기');
+
+    const a = card.querySelector('a')!;
+    const translated = card.querySelector(`[${DATA_ATTRS.TRANSLATED}]`)!;
+    expect(a.contains(translated)).toBe(true);
+    // Regression: must NOT be a direct child of the grid <a> (icon-track item)
+    expect(translated.parentElement).not.toBe(a);
+    // And must not land in the icon column
+    expect(translated.closest('.icon')).toBeNull();
+  });
+});
+
+// ============================================================
+// Fight guard integration (FAB dead-toggle regression)
+// ============================================================
+
+describe('Sole-link card injection — semantic wrapper (LI)', () => {
+  it('LI-wrapped grid card also injects into the text column (claude.com TOC)', () => {
+    setupDOM(
+      '<li><a href="#pulse" style="display: grid">' +
+        '<div class="icon"><svg viewBox="0 0 24 24"></svg></div>' +
+        '<div><div class="t">Get a pulse on your business</div>' +
+        '<div class="d">One Monday-morning page that covers what you would check across tabs.</div></div>' +
+        '</a></li>',
+    );
+    const li = document.querySelector('li') as HTMLElement;
+    injectTranslation(li, '비즈니스 현황 파악하기');
+
+    const a = li.querySelector('a')!;
+    const translated = li.querySelector(`[${DATA_ATTRS.TRANSLATED}]`)!;
+    // Inside the link's text column — never a direct grid item of <a>,
+    // never in the icon track, never dangling outside the card.
+    expect(a.contains(translated)).toBe(true);
+    expect(translated.parentElement).not.toBe(a);
+    expect(translated.closest('.icon')).toBeNull();
+  });
+
+  it('plain (non-grid) sole link inside LI keeps default LI injection', () => {
+    setupDOM(
+      '<li><a href="/somewhere">A regular list link with a fairly long descriptive label here.</a></li>',
+    );
+    const li = document.querySelector('li') as HTMLElement;
+    injectTranslation(li, '일반 리스트 링크 번역');
+
+    const translated = li.querySelector(`[${DATA_ATTRS.TRANSLATED}]`)!;
+    // Non-card semantic wrapper → old behavior preserved (span under LI)
+    expect(translated.parentElement).toBe(li);
+  });
+});
+
+describe('Cancel releases untranslated claims (virtualized-list stranding)', () => {
+  it('strips BLOCK_ID from claim-only blocks on cancel, keeps landed ones', () => {
+    setupDOM(
+      '<p id="landed" data-b3rys-id="b3rys-901">Landed paragraph with translation.</p>' +
+        '<p id="claimed" data-b3rys-id="b3rys-902">Claimed but never injected paragraph.</p>',
+    );
+    // Give the landed block an actual translation span
+    const landed = document.getElementById('landed')!;
+    const span = document.createElement('span');
+    span.setAttribute(DATA_ATTRS.TRANSLATED, 'true');
+    landed.appendChild(span);
+
+    cancelTranslation();
+
+    // Landed keeps its claim (duplicate prevention), stranded one is released
+    expect(landed.hasAttribute(DATA_ATTRS.BLOCK_ID)).toBe(true);
+    expect(document.getElementById('claimed')!.hasAttribute(DATA_ATTRS.BLOCK_ID)).toBe(false);
+  });
+});
+
+describe('Fight guard integration', () => {
+  it('purgeAllTranslations resets the guard — manual re-toggling never yields blocks', () => {
+    resetFightGuard();
+    const t = 1_000_000;
+    recordInjection('Same paragraph text', t);
+    recordInjection('Same paragraph text', t + 1000);
+    recordInjection('Same paragraph text', t + 2000);
+    expect(isFighting('Same paragraph text', t + 3000)).toBe(true);
+
+    // User toggles OFF→ON: purge runs → guard must forget everything
+    purgeAllTranslations();
+    expect(isFighting('Same paragraph text', t + 3000)).toBe(false);
+  });
+
+  it('scroll-driven re-injections (virtualized recycling) never count as fights', () => {
+    resetFightGuard();
+    const t = 2_000_000;
+    for (let i = 0; i < 5; i++) {
+      recordInjection('Recycled chat message', t + i * 1000, true);
+    }
+    expect(isFighting('Recycled chat message', t + 6000)).toBe(false);
   });
 });
