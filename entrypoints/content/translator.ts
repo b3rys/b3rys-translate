@@ -317,7 +317,7 @@ export type TranslationResult = 'done' | 'cancelled' | 'empty';
 /** Current target language (storage) — fingerprint for reveal-in-place. */
 async function getTargetLang(): Promise<string> {
   try {
-    const data = await chrome.storage.sync.get(LANG_STORAGE_KEY);
+    const data = await chrome.storage.local.get(LANG_STORAGE_KEY);
     const stored = data[LANG_STORAGE_KEY] as { target?: string } | undefined;
     return stored?.target || DEFAULT_TARGET_LANG;
   } catch {

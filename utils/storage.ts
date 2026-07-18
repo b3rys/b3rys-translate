@@ -15,17 +15,17 @@ export async function getApiKeys(): Promise<Partial<Record<EngineType, string>>>
 }
 
 export async function getSettings(): Promise<ExtensionSettings> {
-  const [syncResult, engineApiKeys] = await Promise.all([
-    chrome.storage.sync.get<{
+  const [localResult, engineApiKeys] = await Promise.all([
+    chrome.storage.local.get<{
       selectedEngine?: EngineType;
       translationEnabled?: boolean;
     }>(['selectedEngine', 'translationEnabled']),
     getApiKeys(),
   ]);
   return {
-    selectedEngine: syncResult.selectedEngine || 'gemini',
+    selectedEngine: localResult.selectedEngine || 'gemini',
     engineApiKeys,
-    translationEnabled: syncResult.translationEnabled !== false,
+    translationEnabled: localResult.translationEnabled !== false,
   };
 }
 
@@ -36,17 +36,24 @@ export async function saveEngineApiKey(engine: EngineType, key: string): Promise
 }
 
 export async function setSelectedEngine(engine: EngineType): Promise<void> {
-  await chrome.storage.sync.set({ selectedEngine: engine });
+  await chrome.storage.local.set({ selectedEngine: engine });
 }
 
 export async function setTranslationEnabled(enabled: boolean): Promise<void> {
-  await chrome.storage.sync.set({ translationEnabled: enabled });
+  await chrome.storage.local.set({ translationEnabled: enabled });
 }
 
 /**
- * Migrate API keys to chrome.storage.local for security.
- * 1. Old single-key schema (geminiApiKey in sync) → local
- * 2. Multi-engine keys in sync → local, then delete from sync
+ * One-time migration of legacy API keys, then a sync cleanup.
+ *
+ * The extension now stores EVERYTHING in chrome.storage.local — settings and
+ * usage alike. chrome.storage.sync's write quota (120/min, 1800/hour) can't
+ * absorb our write volume (usage stats were written per batch), and once it
+ * trips EVERY sync write silently fails, taking unrelated settings (FAB on/off,
+ * Auto toggle, engine, language) down with it. So sync is no longer used.
+ *
+ * 1. Old API keys that lived in sync (geminiApiKey / engineApiKeys) → local.
+ * 2. Wipe any settings a prior version left orphaned in sync.
  */
 export async function migrateStorage(): Promise<void> {
   const syncData = await chrome.storage.sync.get(['geminiApiKey', 'engineApiKeys']);
@@ -63,8 +70,7 @@ export async function migrateStorage(): Promise<void> {
       localKeys.gemini = syncData.geminiApiKey as string;
       changed = true;
     }
-    await chrome.storage.sync.remove('geminiApiKey');
-    await chrome.storage.sync.set({ selectedEngine: 'gemini' });
+    await chrome.storage.local.set({ selectedEngine: 'gemini' });
   }
 
   // Migrate multi-engine keys from sync → local
@@ -76,17 +82,16 @@ export async function migrateStorage(): Promise<void> {
         changed = true;
       }
     }
-    // Delete API keys from sync storage (no longer synced to Google)
-    await chrome.storage.sync.remove('engineApiKeys');
   }
 
   if (changed) {
     await chrome.storage.local.set({ engineApiKeys: localKeys });
   }
 
-  // Note: usage/cost stats (USAGE_STATS_KEY, COST_LIMIT_KEY, USAGE_RATIO_KEY)
-  // live in chrome.storage.local. sync's write quota (120/min, 1800/hour) can't
-  // absorb the per-batch usage writes, and once it trips EVERY sync write
-  // silently fails — including unrelated settings (FAB on/off, Auto toggle).
-  // No pre-release users had synced usage data, so no back-migration is needed.
+  // Sync is no longer used — clear anything a prior version left there (old API
+  // keys, orphaned settings). Guarded so a clean profile does no write at all.
+  const staleSync = await chrome.storage.sync.get(null);
+  if (Object.keys(staleSync).length > 0) {
+    await chrome.storage.sync.clear();
+  }
 }

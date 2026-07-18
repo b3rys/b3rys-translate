@@ -79,9 +79,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   const errorMessage = document.getElementById('api-error-message') as HTMLSpanElement;
   const dismissError = document.getElementById('dismiss-error') as HTMLButtonElement;
 
-  // Load saved settings (API keys from local, rest from sync)
+  // Load saved settings (all in storage.local — sync is no longer used; see
+  // migrateStorage note on why every setting moved off sync)
   const { selectedEngine, floatingButtonVisible, ytButtonVisible, autoTranslate } =
-    await chrome.storage.sync.get<{
+    await chrome.storage.local.get<{
       selectedEngine?: EngineType;
       floatingButtonVisible?: boolean;
       ytButtonVisible?: boolean;
@@ -142,14 +143,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // Load saved target language
-  const langData = await chrome.storage.sync.get(LANG_STORAGE_KEY);
+  const langData = await chrome.storage.local.get(LANG_STORAGE_KEY);
   const savedLang = langData[LANG_STORAGE_KEY] as { target?: string } | undefined;
   targetLangSelect.value = savedLang?.target || DEFAULT_TARGET_LANG;
   updateLangBadge();
 
   targetLangSelect.addEventListener('change', async () => {
     const target = targetLangSelect.value;
-    await chrome.storage.sync.set({ [LANG_STORAGE_KEY]: { target } });
+    await chrome.storage.local.set({ [LANG_STORAGE_KEY]: { target } });
     updateLangBadge();
   });
 
@@ -173,7 +174,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Engine selection change
   engineSelect.addEventListener('change', async () => {
     const engine = engineSelect.value as EngineType;
-    await chrome.storage.sync.set({ selectedEngine: engine });
+    await chrome.storage.local.set({ selectedEngine: engine });
     loadKeyForEngine(engine);
     updateBadge(engine);
   });
@@ -218,7 +219,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Toggle floating button
   fabToggle.addEventListener('change', async () => {
     const visible = fabToggle.checked;
-    await chrome.storage.sync.set({ floatingButtonVisible: visible });
+    await chrome.storage.local.set({ floatingButtonVisible: visible });
     updateFabStatus(visible);
 
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -233,7 +234,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Toggle YouTube button
   ytBtnToggle.addEventListener('change', async () => {
     const visible = ytBtnToggle.checked;
-    await chrome.storage.sync.set({ ytButtonVisible: visible });
+    await chrome.storage.local.set({ ytButtonVisible: visible });
     updateYtBtnStatus(visible);
 
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -248,7 +249,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Toggle auto-translate (translate every page automatically)
   autoToggle.addEventListener('change', async () => {
     const enabled = autoToggle.checked;
-    await chrome.storage.sync.set({ autoTranslate: enabled });
+    await chrome.storage.local.set({ autoTranslate: enabled });
     updateAutoStatus(enabled);
 
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });

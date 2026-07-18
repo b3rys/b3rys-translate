@@ -24,7 +24,7 @@ import { LANG_STORAGE_KEY, DEFAULT_TARGET_LANG, LANGUAGES } from '@/utils/consta
 import type { LanguageCode } from '@/utils/constants';
 import { clearVideo as clearTranslations } from './subtitle-cache';
 
-// AI subtitle segmentation: read from chrome.storage.sync at runtime
+// AI subtitle segmentation: read from chrome.storage.local at runtime
 
 /** 'one-line': 1줄 강제 (nowrap, MAX 80). 'two-line': 2줄 balance (MAX 110). */
 const SUBTITLE_LINE_MODE: 'one-line' | 'two-line' = 'one-line';
@@ -54,7 +54,7 @@ export function initYouTubeSubtitles(): void {
   // Apply initial visibility
   buttonReady.then(async () => {
     try {
-      const { ytButtonVisible } = await chrome.storage.sync.get<{
+      const { ytButtonVisible } = await chrome.storage.local.get<{
         ytButtonVisible?: boolean;
       }>('ytButtonVisible');
       if (ytButtonVisible === false) button?.hide();
@@ -65,7 +65,7 @@ export function initYouTubeSubtitles(): void {
 
   // Restart rolling translation when target language changes
   chrome.storage.onChanged.addListener((changes, area) => {
-    if (area !== 'sync' || !changes[LANG_STORAGE_KEY]) return;
+    if (area !== 'local' || !changes[LANG_STORAGE_KEY]) return;
     if (!isActive || !activeVideoId || !activeCues || !abortController) return;
 
     // Clear subtitle cache for current video and restart translation
@@ -121,7 +121,7 @@ function cancelPipeline(): void {
 /** Read the target language from storage (falls back to default). */
 async function getTargetLanguage(): Promise<string> {
   try {
-    const data = await chrome.storage.sync.get(LANG_STORAGE_KEY);
+    const data = await chrome.storage.local.get(LANG_STORAGE_KEY);
     const stored = data[LANG_STORAGE_KEY] as { target?: string } | undefined;
     return stored?.target || DEFAULT_TARGET_LANG;
   } catch {
@@ -329,7 +329,7 @@ async function handleButtonClick(): Promise<void> {
 
     // Semantic refinement: only for ASR subtitles (manual subs already have punctuation)
     if (!isManual) {
-      const { ytAiSubtitleEnabled, selectedEngine } = await chrome.storage.sync.get<{
+      const { ytAiSubtitleEnabled, selectedEngine } = await chrome.storage.local.get<{
         ytAiSubtitleEnabled?: boolean;
         selectedEngine?: string;
       }>(['ytAiSubtitleEnabled', 'selectedEngine']);

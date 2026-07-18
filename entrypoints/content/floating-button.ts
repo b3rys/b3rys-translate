@@ -52,7 +52,7 @@ export function createFloatingButton(onClick: () => void): FloatingButton {
   closeBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     host.style.display = 'none';
-    chrome.storage.sync.set({ floatingButtonVisible: false }).catch(() => {});
+    chrome.storage.local.set({ floatingButtonVisible: false }).catch(() => {});
   });
 
   // FAB

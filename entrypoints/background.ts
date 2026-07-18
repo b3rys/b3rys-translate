@@ -238,7 +238,7 @@ async function updateUsageRatio(stats: UsageStats): Promise<void> {
 /** Resolve the effective target language: message override > storage > default. */
 async function resolveTargetLang(msgTargetLang?: string): Promise<string> {
   if (msgTargetLang) return msgTargetLang;
-  const langData = await chrome.storage.sync.get(LANG_STORAGE_KEY);
+  const langData = await chrome.storage.local.get(LANG_STORAGE_KEY);
   const stored = langData[LANG_STORAGE_KEY] as { target?: string } | undefined;
   return stored?.target || DEFAULT_TARGET_LANG;
 }
@@ -274,7 +274,7 @@ async function handleTranslateBatch(
   msgSourceLang?: string,
   msgTargetLang?: string,
 ): Promise<TranslateBatchResponse> {
-  const { selectedEngine } = await chrome.storage.sync.get<{
+  const { selectedEngine } = await chrome.storage.local.get<{
     selectedEngine?: EngineType;
   }>('selectedEngine');
   const { engineApiKeys } = await chrome.storage.local.get<{

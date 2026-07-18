@@ -16,7 +16,7 @@ let sourceScript: 'latin' | 'cjk' | 'cyrillic' = 'latin';
 /** Load source language script type from storage. Called once on init. */
 export async function loadSourceLanguage(): Promise<void> {
   try {
-    const data = await chrome.storage.sync.get(LANG_STORAGE_KEY);
+    const data = await chrome.storage.local.get(LANG_STORAGE_KEY);
     const stored = data[LANG_STORAGE_KEY] as { source?: string } | undefined;
     const code = (stored?.source || DEFAULT_SOURCE_LANG) as LanguageCode;
     sourceScript = LANGUAGES[code]?.script ?? 'latin';

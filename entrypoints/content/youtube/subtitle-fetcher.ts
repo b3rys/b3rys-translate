@@ -46,7 +46,7 @@ export async function pickSourceLanguageTrack(
 
   let sourceLang = DEFAULT_SOURCE_LANG;
   try {
-    const data = await chrome.storage.sync.get(LANG_STORAGE_KEY);
+    const data = await chrome.storage.local.get(LANG_STORAGE_KEY);
     const stored = data[LANG_STORAGE_KEY] as { source?: string } | undefined;
     sourceLang = (stored?.source as typeof DEFAULT_SOURCE_LANG) || DEFAULT_SOURCE_LANG;
   } catch {
