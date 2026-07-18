@@ -55,6 +55,14 @@
 - [x] 멀티언어 지원 (타겟 언어 선택 10개, 소스 자동감지, 캐시 언어별 분리, YouTube 실시간 반영)
 - [x] 오픈소스 공개 준비 (Apache-2.0 · NOTICE · 엔진 갱신 gpt-4.1-nano/gemini-3.1 · README 재구성)
 - [x] Claude Code 설치 스킬 (`/b3translate` — GitHub URL → 설치·API 키·사용법 가이드)
+- [x] 크롬 웹스토어 등록 (v0.5.2 Unlisted 제출, 심사 대기)
+- [x] 자동 번역 모드 (Auto 토글, 기본 OFF · circuit breaker 15→30)
+- [x] B2 번역 파이프라인 (priority pool + worker 6 + 스크롤 추종 재정렬)
+- [x] 스크롤 안정화 (pinAnchor multi-tick 재고정 · 미디어 제외 앵커 · 네이티브 anchoring 대응)
+- [x] reveal-in-place 토글 (off=CSS 숨김/DOM 보존, on=클래스 제거만 — 재주입 제로, 언어 변경 시만 재구축)
+- [x] 콘솔 침묵 (기본 무로그, `localStorage.b3rys_debug='1'`로만 디버그)
+- [x] 배포 전 인수테스트 게이트 (docs/release-checklist.md)
+- [x] Auto 모드 = 둥둥이 상태 유지 (FAB OFF면 페이지 이동해도 번역 안 함 · empty/cancelled 패스의 sticky 오염 제거) (#10)
 
 > 범례: `[x]` 완료 · `[~]` 진행중 · `[ ]` 미착수
 

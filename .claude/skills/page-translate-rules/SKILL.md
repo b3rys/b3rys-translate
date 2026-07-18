@@ -176,11 +176,12 @@ detectTextBlocks()
 - **스크롤 팔로잉** (핵심): 스크롤 시 throttle(180ms)로 `pending`을 **현재 뷰포트 거리 기준 재정렬** → 사용자가 스크롤한 곳이 다음 배치가 됨(큐가 눈을 따라감). 거리는 블록당 1회만 측정해 Map 캐시 (comparator가 `getBoundingClientRect`를 O(n log n)회 호출하는 것 방지)
 - **동시성 통일**: 옛 뷰포트 무제한(Promise.all→rate limit 버스트 위험) 제거, 전 구간 `PIPELINE_CONCURRENCY`로 bound. 정상 페이지는 총 호출이 rate limit(150/분) 훨씬 아래
 - **drift 보정 공용화**: 모든 DOM 변이(로더 in/out·주입·에러·숨김)는 `withScrollCompensation(scroller, mutate)` 하나로 통일. scroller는 배치 요소에서 `getScrollContainer()`로 도출, 앵커는 `findContentAnchor()`가 스크롤러 내부를 탐침 (상세 규칙: safety-rules 스킬의 "스크롤 drift 보정")
+- **reveal-in-place 토글** (translator.ts): FAB off = 번역 DOM을 제거하지 않고 `HIDING_CLASS`(body `b3rys-hiding-translations`)로 숨김만. FAB on 시 ①숨김 클래스 존재 ②숨긴 번역 존재 ③`body.dataset.b3rysLang === 현재 타겟 언어` (done 패스에서 기록) 세 조건이 맞으면 클래스 제거만으로 즉시 복원(보정 포함, 재주입·API 제로). 하나라도 어긋나면 purge 후 재구축. **토글 경로에 물리 제거/재주입을 다시 넣지 말 것** — on/off 지연·미세 스크롤 튐이 재발한다
 
 ## 번역 캐시 (background.ts + translation-cache.ts)
 
 - LRU 캐시, `chrome.storage.local`에 영속 저장
-- TTL: 7일, 최대 1000개 엔트리
+- TTL: 7일, 최대 4000개 엔트리 (1000은 claude.com급 카드 페이지 하나로 evict — 늘릴 땐 storage.local 5MB 한도 고려)
 - API 호출 전 캐시 조회 → 히트 시 즉시 반환, 미스만 엔진 호출
 - 캐시 키 prefix는 `cacheKeyPrefix(targetLang, mode)` 단일 소스 — `CACHE_LOOKUP`과 `TRANSLATE_BATCH`가 공유 (어긋나면 선주입이 무력화되므로 반드시 이 함수만 사용)
 - 캐시 클리어: 서비스워커 콘솔에서 `chrome.storage.local.remove('b3rys_translation_cache')`
