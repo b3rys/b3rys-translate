@@ -9,7 +9,11 @@ import type { TranslationResult } from '@/entrypoints/content/translator';
 import { checkCircuitBreaker } from './circuit-breaker';
 
 const CIRCUIT_WINDOW = 60_000; // 1 minute
-const CIRCUIT_MAX = 15; // max translation starts per window
+// Max *productive* translation starts per window. Auto-translate legitimately
+// starts a pass on every page you browse, so 15 was too tight (≈1 page/4s).
+// A real runaway loop fires dozens/sec, so 30 still catches it — and empty
+// passes + the fight guard already absorb churn.
+const CIRCUIT_MAX = 30;
 const ERROR_RECOVERY_MS = 3000;
 
 /**
