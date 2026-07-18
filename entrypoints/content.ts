@@ -26,7 +26,7 @@ import { dbg } from '@/utils/debug';
 
 /** Does the currently-selected engine have an API key saved? (no side effects) */
 async function hasApiKeyStored(): Promise<boolean> {
-  const { selectedEngine } = await chrome.storage.sync.get<{ selectedEngine?: string }>(
+  const { selectedEngine } = await chrome.storage.local.get<{ selectedEngine?: string }>(
     'selectedEngine',
   );
   const { engineApiKeys } = await chrome.storage.local.get<{
@@ -94,7 +94,7 @@ export default defineContentScript({
       onProgress: (ratio) => fab.setProgress(ratio),
       persistEnabled: async (enabled) => {
         try {
-          await chrome.storage.sync.set({ translationEnabled: enabled });
+          await chrome.storage.local.set({ translationEnabled: enabled });
         } catch (err) {
           if (isContextInvalidated(err)) {
             markContextInvalidated();
@@ -131,7 +131,7 @@ export default defineContentScript({
     });
 
     // Apply initial floating button visibility (also controls selection popup)
-    chrome.storage.sync
+    chrome.storage.local
       .get<{ floatingButtonVisible?: boolean }>('floatingButtonVisible')
       .then(({ floatingButtonVisible }) => {
         if (floatingButtonVisible === false) {
@@ -141,7 +141,7 @@ export default defineContentScript({
       });
 
     // Restore translation mode from storage
-    chrome.storage.sync
+    chrome.storage.local
       .get<{ translationMode?: TranslationMode }>('translationMode')
       .then(({ translationMode: saved }) => {
         if (saved) {
@@ -154,7 +154,7 @@ export default defineContentScript({
     fab.onModeToggle((mode) => {
       sm.setMode(mode);
       setTranslationMode(mode);
-      chrome.storage.sync.set({ translationMode: mode }).catch(() => {});
+      chrome.storage.local.set({ translationMode: mode }).catch(() => {});
     });
 
     // Load initial usage gauge (usage/cost lives in storage.local — see
@@ -167,18 +167,17 @@ export default defineContentScript({
       })
       .catch(() => {});
 
-    // Listen for storage changes from other tabs. Usage ratio is in `local`;
-    // the prefs below are in `sync` — dispatch by area, don't early-return.
+    // Listen for storage changes from other tabs. All settings + usage live in
+    // storage.local now (sync's write quota can't take our write volume — see
+    // usage-storage note), so only the `local` area matters.
     chrome.storage.onChanged.addListener((changes, area) => {
-      if (area === 'local') {
-        if (changes[USAGE_RATIO_KEY]) {
-          fab.setUsageGauge(changes[USAGE_RATIO_KEY].newValue as number);
-        }
-        return;
-      }
-      if (area !== 'sync') return;
+      if (area !== 'local') return;
 
-      // Sync translation mode across tabs (live, no refresh needed)
+      if (changes[USAGE_RATIO_KEY]) {
+        fab.setUsageGauge(changes[USAGE_RATIO_KEY].newValue as number);
+      }
+
+      // Propagate translation mode across tabs (live, no refresh needed)
       if (changes.translationMode) {
         const mode = changes.translationMode.newValue as TranslationMode;
         sm.setMode(mode);
@@ -188,9 +187,9 @@ export default defineContentScript({
         }
       }
 
-      // Sync auto-translate flag across tabs. Only update the flag here —
-      // don't auto-translate background tabs (the active tab is handled by the
-      // TOGGLE_AUTO_TRANSLATE message); other tabs translate on their next nav.
+      // Auto-translate flag: only update the flag here — don't auto-translate
+      // background tabs (the active tab is handled by TOGGLE_AUTO_TRANSLATE;
+      // other tabs translate on their next nav).
       if (changes.autoTranslate) {
         autoTranslate = changes.autoTranslate.newValue === true;
       }
@@ -205,7 +204,7 @@ export default defineContentScript({
         sm.setMode(message.mode);
         fab.setMode(message.mode);
         setTranslationMode(message.mode);
-        chrome.storage.sync.set({ translationMode: message.mode }).catch(() => {});
+        chrome.storage.local.set({ translationMode: message.mode }).catch(() => {});
       }
       if (message.type === 'TOGGLE_FLOATING_BUTTON') {
         if (message.visible) {
@@ -237,7 +236,7 @@ export default defineContentScript({
     async function autoTranslateCurrentPage(): Promise<void> {
       if (!autoTranslate || isMarkedInvalidated()) return;
       if (!(await hasApiKeyStored())) return; // no key → stay quiet
-      const { translationEnabled } = await chrome.storage.sync.get<{
+      const { translationEnabled } = await chrome.storage.local.get<{
         translationEnabled?: boolean;
       }>('translationEnabled');
       // Unset (never clicked the FAB) counts as ON — enabling auto mode should
@@ -257,7 +256,7 @@ export default defineContentScript({
       }
     }
 
-    chrome.storage.sync
+    chrome.storage.local
       .get<{ autoTranslate?: boolean }>('autoTranslate')
       .then(({ autoTranslate: on }) => {
         autoTranslate = on === true;

@@ -28,7 +28,7 @@ export async function startRollingTranslation(
 
   let targetLang = DEFAULT_TARGET_LANG;
   try {
-    const data = await chrome.storage.sync.get(LANG_STORAGE_KEY);
+    const data = await chrome.storage.local.get(LANG_STORAGE_KEY);
     const stored = data[LANG_STORAGE_KEY] as { target?: string } | undefined;
     targetLang = (stored?.target as typeof DEFAULT_TARGET_LANG) || DEFAULT_TARGET_LANG;
   } catch {

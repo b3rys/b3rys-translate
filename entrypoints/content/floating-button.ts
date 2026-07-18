@@ -52,7 +52,7 @@ export function createFloatingButton(onClick: () => void): FloatingButton {
   closeBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     host.style.display = 'none';
-    chrome.storage.sync.set({ floatingButtonVisible: false }).catch(() => {});
+    chrome.storage.local.set({ floatingButtonVisible: false }).catch(() => {});
   });
 
   // FAB
@@ -175,16 +175,23 @@ export function createFloatingButton(onClick: () => void): FloatingButton {
 
     showToast(text: string) {
       const existing = shadow.querySelector('.b3rys-toast');
-      if (existing) existing.remove();
+      // Same message already on screen → leave it running. Re-creating the
+      // element restarts the fade-in animation, which reads as flicker when
+      // showToast fires repeatedly (e.g. an invalidated context on every click).
+      if (existing) {
+        if (existing.textContent === text) return;
+        existing.remove();
+      }
 
       const toast = document.createElement('div');
       toast.className = 'b3rys-toast';
       toast.textContent = text;
       fab.appendChild(toast);
 
-      const removeToast = () => toast.remove();
-      setTimeout(removeToast, 3000);
-      wrap.addEventListener('mouseleave', removeToast, { once: true });
+      // Let the CSS fade it in and out quietly (toastOut starts at 2.5s); just
+      // clean up the node afterward. No mouseleave removal — that yanked it out
+      // abruptly mid-fade.
+      setTimeout(() => toast.remove(), 3000);
     },
 
     show() {
