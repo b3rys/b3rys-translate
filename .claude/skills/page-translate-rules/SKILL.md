@@ -46,7 +46,7 @@ detectTextBlocks()
 - DIV, SPAN, A, BUTTON, TIME 중:
   - `children.length === 0` (리프 요소), 또는
   - `hasOnlyInlineChildren()` — 재귀적 검사 (자식 + 손자까지 모두 인라인 태그: A, SPAN, STRONG, EM 등. 카드 wrapping `<a>` 내부에 DIV가 있으면 거부) **AND** `!isCompositeCells()`
-- **`isCompositeCells()` — 복합 셀 컨테이너 분해** (anthropic.com/news 회귀): 텍스트 가진 자식 ≥2 + 컨테이너 직속 loose 텍스트 없음 + 인접 자식 텍스트가 **공백 없이 글루**되면(예: `<span>Date</span><span>Category</span>` → "DateCategory") 한 단위로 수락하지 않고 SKIP → 하강해서 각 셀을 개별 감지. Phase 1 `getDirectText`/`getDirectHTML`도 동일 술어로 composite 자식을 경계 처리 (LI가 행 전체를 흡수하는 경로 차단). 레이아웃 읽기 없음 — 순수 DOM 판정이라 happy-dom 테스트 가능
+- **`isCompositeCells()` — 복합 셀 컨테이너 분해**: 텍스트 가진 자식 ≥2 + 직속 loose 텍스트 없음일 때 두 신호 중 하나면 셀 분해 — ①**글루**(인접 자식 텍스트가 공백 없이 접합, anthropic.com/news `DateCategory`) ②**블록 셀**(인접 두 자식이 DIV/SECTION 등 `BLOCK_CELL_TAGS` — 카드의 title/desc div 쌍, claude.com TOC run-on 회귀). 한 단위로 수락하지 않고 SKIP → 하강해서 각 셀 개별 감지. Phase 1 `getDirectText`/`getDirectHTML`도 동일 술어로 composite 자식을 경계 처리 (LI가 행 전체를 흡수하는 경로 차단). 레이아웃 읽기 없음 — 순수 DOM 판정이라 happy-dom 테스트 가능
 - Phase 1에서 이미 감지된 요소(`DATA_ATTRS.BLOCK_ID`)는 REJECT (중복 방지)
 - **조상 중복 제거**: 부모가 이미 Phase 2에서 감지된 경우 자식은 제외 (`parentElement.closest([BLOCK_ID])`)
 - HTML은 `textContent`(순수 텍스트)로 전송 — innerHTML 사용 안 함 (SVG 등 안전성)
@@ -168,12 +168,13 @@ detectTextBlocks()
 - A 태그: href, title만 허용, javascript:/data: 차단
 - style 속성: 안전한 CSS만 허용 (color, text-decoration, font-weight 등)
 
-## 배치 전략
+## 배치 전략 (`runPipeline` — 우선순위 풀 + 워커)
 
-- **Phase 0 — 캐시 선주입** (`injectCachedTranslations`): 배칭 전에 `CACHE_LOOKUP` 메시지(순수 캐시 읽기 — API·rate limit·통계 없음)로 전체 블록을 한 번에 조회, hit은 즉시 주입하고 **miss만** 아래 배치 단계로 진입. 재방문 페이지가 즉시 렌더되는 이유. lookup 실패는 non-fatal (전량 일반 경로 폴백)
-- **Viewport-first**: 화면에 보이는 블록 먼저 번역 (`VIEWPORT_BATCH_SIZE = 5`)
-- **Parallel batching**: 나머지는 `BATCH_SIZE = 15`씩, `PARALLEL_BATCH_COUNT = 3`개 동시 처리
-- **거리순 정렬**: viewport 밖 블록은 거리순으로 번역
+- **Phase 0 — 캐시 선주입** (`injectCachedTranslations`): 배칭 전에 `CACHE_LOOKUP` 메시지(순수 캐시 읽기 — API·rate limit·통계 없음)로 전체 블록을 한 번에 조회, hit은 즉시 주입하고 **miss만** 파이프라인으로. 재방문 페이지가 즉시 렌더되는 이유. lookup 실패는 non-fatal (전량 일반 경로 폴백)
+- **단일 우선순위 풀** (`runPipeline`): 옛 Phase 1a→1b→2 순차 배리어를 폐지. miss 블록을 하나의 `pending` 풀에 넣고 `PIPELINE_CONCURRENCY(=6)` 워커가 앞에서부터 `BATCH_SIZE(=15)`씩 뽑아 처리. 워커는 배치 끝나는 즉시 다음을 뽑음 → 배리어 idle 제거, 풀 saturation 유지
+- **초기 순서**: main-viewport → side-viewport → remaining(거리순). 뷰포트가 먼저 그려짐
+- **스크롤 팔로잉** (핵심): 스크롤 시 throttle(180ms)로 `pending`을 **현재 뷰포트 거리 기준 재정렬** → 사용자가 스크롤한 곳이 다음 배치가 됨(큐가 눈을 따라감). 거리는 블록당 1회만 측정해 Map 캐시 (comparator가 `getBoundingClientRect`를 O(n log n)회 호출하는 것 방지)
+- **동시성 통일**: 옛 뷰포트 무제한(Promise.all→rate limit 버스트 위험) 제거, 전 구간 `PIPELINE_CONCURRENCY`로 bound. 정상 페이지는 총 호출이 rate limit(150/분) 훨씬 아래
 - **drift 보정 공용화**: 모든 DOM 변이(로더 in/out·주입·에러·숨김)는 `withScrollCompensation(scroller, mutate)` 하나로 통일. scroller는 배치 요소에서 `getScrollContainer()`로 도출, 앵커는 `findContentAnchor()`가 스크롤러 내부를 탐침 (상세 규칙: safety-rules 스킬의 "스크롤 drift 보정")
 
 ## 번역 캐시 (background.ts + translation-cache.ts)

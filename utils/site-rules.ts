@@ -16,6 +16,14 @@ export interface SiteRule {
   translateSelectors?: string[];
   /** Replace element content entirely with translation (used with translateSelectors) */
   forceReplace?: boolean;
+  /**
+   * After a translation pass, nudge the scroll container by 1px to force a
+   * repaint. For virtualized / `content-visibility` lists (Substack chat) the
+   * browser defers painting injected content until the next scroll — so the
+   * translation is in the DOM but invisible until the user nudges the scroll.
+   * Scoped per-site so it never runs anywhere it isn't needed.
+   */
+  repaintAfterInject?: boolean;
 }
 
 const SITE_RULES: Record<string, SiteRule> = {
@@ -34,6 +42,9 @@ const SITE_RULES: Record<string, SiteRule> = {
   'substack.com': {
     injectAsSibling: true,
     mainContentSelector: '.post-content, .body-SxXE9l, article',
+    // Substack chat virtualizes messages — injected translations don't paint
+    // until a scroll. Force a repaint after each pass.
+    repaintAfterInject: true,
   },
   'mail.google.com': {
     // Scope detection to the reading pane. Gmail's left nav, chat panel, and

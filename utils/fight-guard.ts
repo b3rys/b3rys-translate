@@ -18,8 +18,22 @@ const MAX_TRACKED = 1000;
 
 const injections = new Map<string, number[]>();
 
-/** Record that a translation was injected for this block text. */
-export function recordInjection(text: string, now: number = Date.now()): void {
+/**
+ * Record that a translation was injected for this block text.
+ *
+ * `scrollDriven`: the injection follows recent user scrolling. Virtualized
+ * lists (Substack chat) destroy off-screen nodes and re-create them on
+ * scroll-back — re-injecting there is restoration, not a fight, so it must not
+ * count (or every recycled message ends up permanently yielded). A genuine
+ * re-render fight (Gmail widgets) keeps cycling with NO scrolling in between,
+ * so its injections still accumulate.
+ */
+export function recordInjection(
+  text: string,
+  now: number = Date.now(),
+  scrollDriven = false,
+): void {
+  if (scrollDriven) return;
   const cutoff = now - FIGHT_WINDOW_MS;
   const recent = (injections.get(text) ?? []).filter((t) => t >= cutoff);
   recent.push(now);

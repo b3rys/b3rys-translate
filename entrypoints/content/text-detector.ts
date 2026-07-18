@@ -220,19 +220,24 @@ function hasOnlyInlineChildren(el: HTMLElement): boolean {
   return true;
 }
 
+/** Block-level container tags that render as separate visual cells/lines. */
+const BLOCK_CELL_TAGS = new Set(['DIV', 'SECTION', 'ARTICLE', 'UL', 'OL', 'TABLE', 'FIGURE']);
+
 /**
- * Composite-cell container: element children that read as separate visual cells
- * (e.g. a news row: date | category | title). Their textContents concatenate
- * with no whitespace, so translating the container as ONE unit produces run-on
- * garbage ("Jul 14, 2026Product Introducing…" → "2026년 7월 14일제품…").
- * Each cell must be its own translation unit instead.
+ * Composite-cell container: element children that read as separate visual cells.
+ * Translating such a container as ONE unit produces run-on garbage — each cell
+ * must be its own translation unit instead. Two structural signals (no layout
+ * reads — deterministic in tests), both requiring ≥2 text-bearing children and
+ * no loose text directly inside the container (a real sentence has some, e.g.
+ * <p>Hello <strong>world</strong> again</p>):
  *
- * Detected structurally (no layout reads — deterministic in tests):
- *   1. ≥2 direct element children carrying their own text
- *   2. no loose text directly inside the container (a real sentence has some,
- *      e.g. <p>Hello <strong>world</strong> again</p>)
- *   3. at least one adjacent text-bearing pair whose texts would join without
- *      any whitespace boundary — the "glue" that breaks translation
+ * 1. GLUE — an adjacent text-bearing pair whose texts join without any
+ *    whitespace boundary (news row: date|category|title →
+ *    "Jul 14, 2026Product Introducing…" → "2026년 7월 14일제품…").
+ * 2. BLOCK CELLS — two adjacent text-bearing children are block-level
+ *    containers (e.g. a card's <div>title</div> + <div>description</div>).
+ *    They render as separate lines; merging them makes one run-on translation
+ *    that then lands in a single child, misplaced (claude.com TOC cards).
  */
 export function isCompositeCells(el: HTMLElement): boolean {
   const textKids = (Array.from(el.children) as HTMLElement[]).filter(
@@ -245,10 +250,15 @@ export function isCompositeCells(el: HTMLElement): boolean {
   }
 
   for (let i = 0; i < textKids.length - 1; i++) {
-    const a = textKids[i].textContent ?? '';
-    const b = textKids[i + 1].textContent ?? '';
-    if (/\s$/.test(a) || /^\s/.test(b)) continue; // own edges provide a boundary
-    if (hasWhitespaceBetween(el, textKids[i], textKids[i + 1])) continue;
+    const a = textKids[i];
+    const b = textKids[i + 1];
+    // Signal 2: adjacent block-level text cells (title/desc card pattern)
+    if (BLOCK_CELL_TAGS.has(a.tagName) && BLOCK_CELL_TAGS.has(b.tagName)) return true;
+    // Signal 1: glued inline cells
+    const at = a.textContent ?? '';
+    const bt = b.textContent ?? '';
+    if (/\s$/.test(at) || /^\s/.test(bt)) continue; // own edges provide a boundary
+    if (hasWhitespaceBetween(el, a, b)) continue;
     return true;
   }
   return false;
