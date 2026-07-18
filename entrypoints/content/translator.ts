@@ -1,12 +1,6 @@
 import type { TextBlock, TranslationMode } from '@/types';
 import type { TranslateBatchResponse, CacheLookupResponse } from '@/utils/messaging';
-import {
-  BATCH_SIZE,
-  VIEWPORT_BATCH_SIZE,
-  PARALLEL_BATCH_COUNT,
-  DATA_ATTRS,
-  TRANSLATABLE_TAGS,
-} from '@/utils/constants';
+import { BATCH_SIZE, PIPELINE_CONCURRENCY, DATA_ATTRS, TRANSLATABLE_TAGS } from '@/utils/constants';
 import { getSiteRule } from '@/utils/site-rules';
 import { isFighting, recordInjection } from '@/utils/fight-guard';
 import { detectTextBlocks } from './text-detector';
@@ -194,35 +188,98 @@ export async function translatePage(
 
   const { mainViewport, sideViewport, remaining } = classifyBlocks(misses);
 
-  // Phase 1a: Main content in viewport — highest priority for perceived speed
-  if ((await runBatches(mainViewport, VIEWPORT_BATCH_SIZE, gen)) === 'cancelled') {
-    restoreScrollStyles();
-    return 'cancelled';
-  }
-  completed += mainViewport.length;
-  onProgress?.(completed, total);
+  // One priority-ordered POOL (not a fixed batch array). Initial order:
+  // main-viewport → side-viewport → remaining (distance-sorted). The pipeline
+  // re-sorts the not-yet-dispatched blocks whenever the user scrolls, so the
+  // queue follows the eyes instead of being a fixed snapshot from start.
+  const ordered = [...mainViewport, ...sideViewport, ...remaining];
 
-  // Phase 1b: Sidebar/nav viewport blocks
-  if ((await runBatches(sideViewport, VIEWPORT_BATCH_SIZE, gen)) === 'cancelled') {
-    restoreScrollStyles();
-    return 'cancelled';
-  }
-  completed += sideViewport.length;
-  onProgress?.(completed, total);
-
-  // Phase 2: Remaining batches — parallel with concurrency limit
-  if (
-    (await runBatchesThrottled(remaining, BATCH_SIZE, PARALLEL_BATCH_COUNT, gen, (n) => {
-      completed += n;
-      onProgress?.(completed, total);
-    })) === 'cancelled'
-  ) {
-    restoreScrollStyles();
-    return 'cancelled';
-  }
+  const result = await runPipeline(ordered, PIPELINE_CONCURRENCY, gen, (n) => {
+    completed += n;
+    onProgress?.(completed, total);
+  });
 
   restoreScrollStyles();
-  return gen === translateGen ? 'done' : 'cancelled';
+  return result;
+}
+
+/** Distance of an element from the current viewport (0 = on screen). */
+function viewportDistance(el: Element): number {
+  const rect = el.getBoundingClientRect();
+  const vh = window.innerHeight;
+  return Math.min(Math.abs(rect.top), Math.abs(rect.top - vh));
+}
+
+/** Leading+trailing throttle: runs at most once per `ms`, and once more after. */
+function throttle(fn: () => void, ms: number): () => void {
+  let last = 0;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  return () => {
+    const now = Date.now();
+    const wait = ms - (now - last);
+    if (wait <= 0) {
+      last = now;
+      fn();
+    } else if (timer === null) {
+      timer = setTimeout(() => {
+        timer = null;
+        last = Date.now();
+        fn();
+      }, wait);
+    }
+  };
+}
+
+/**
+ * Drain a priority POOL of blocks with a fixed pool of `concurrency` workers.
+ *
+ * - No phase barriers: a worker pulls the next-nearest blocks the instant it's
+ *   free, so the pool stays saturated (vs. the old Phase 1a→1b→2 idling).
+ * - Scroll-following: a throttled scroll handler re-sorts the pending blocks by
+ *   *current* viewport distance, so whatever the user scrolls to is translated
+ *   next — the queue tracks the eyes rather than a start-time snapshot.
+ * - Bounded concurrency avoids the old unbounded viewport burst (rate-limit safe).
+ */
+async function runPipeline(
+  blocks: TextBlock[],
+  concurrency: number,
+  gen: number,
+  onBatchDone: (count: number) => void,
+): Promise<'done' | 'cancelled'> {
+  const pending = blocks.slice();
+
+  // Re-order not-yet-dispatched blocks toward the current viewport. Distance is
+  // measured ONCE per block (n rect reads, one layout flush) then cached — a
+  // naive comparator would call getBoundingClientRect O(n log n) times.
+  const resort = throttle(() => {
+    if (gen !== translateGen) return;
+    const dist = new Map<TextBlock, number>();
+    for (const b of pending) dist.set(b, viewportDistance(b.element));
+    pending.sort((a, b) => (dist.get(a) ?? 0) - (dist.get(b) ?? 0));
+  }, 180);
+  window.addEventListener('scroll', resort, { passive: true });
+
+  try {
+    const worker = async (): Promise<void> => {
+      while (pending.length > 0) {
+        if (gen !== translateGen) return;
+        const batch = pending.splice(0, BATCH_SIZE); // nearest blocks first
+        await processBatch(batch, gen);
+        if (gen !== translateGen) return;
+        onBatchDone(batch.length);
+      }
+    };
+    const poolSize = Math.max(1, Math.min(concurrency, Math.ceil(pending.length / BATCH_SIZE)));
+    await Promise.all(Array.from({ length: poolSize }, () => worker()));
+  } finally {
+    window.removeEventListener('scroll', resort);
+  }
+
+  if (gen !== translateGen) {
+    cleanupLoaders();
+    return 'cancelled';
+  }
+  return 'done';
 }
 
 function classifyBlocks(allBlocks: TextBlock[]): {
@@ -273,41 +330,6 @@ function classifyBlocks(allBlocks: TextBlock[]): {
   }
 
   return { mainViewport, sideViewport, remaining };
-}
-
-async function runBatches(
-  blocks: TextBlock[],
-  batchSize: number,
-  gen: number,
-): Promise<'done' | 'cancelled'> {
-  if (blocks.length === 0) return 'done';
-  const batches = chunkArray(blocks, batchSize);
-  await Promise.all(batches.map((batch) => processBatch(batch, gen)));
-  if (gen !== translateGen) {
-    cleanupLoaders();
-    return 'cancelled';
-  }
-  return 'done';
-}
-
-async function runBatchesThrottled(
-  blocks: TextBlock[],
-  batchSize: number,
-  concurrency: number,
-  gen: number,
-  onGroupDone: (count: number) => void,
-): Promise<'done' | 'cancelled'> {
-  const batches = chunkArray(blocks, batchSize);
-  for (let i = 0; i < batches.length; i += concurrency) {
-    if (gen !== translateGen) {
-      cleanupLoaders();
-      return 'cancelled';
-    }
-    const group = batches.slice(i, i + concurrency);
-    await Promise.all(group.map((batch) => processBatch(batch, gen)));
-    onGroupDone(group.reduce((sum, b) => sum + b.length, 0));
-  }
-  return 'done';
 }
 
 /**
@@ -935,12 +957,4 @@ function showError(element: HTMLElement, message: string): void {
   errorEl.setAttribute(DATA_ATTRS.TRANSLATED, 'true');
   errorEl.textContent = `번역 실패: ${message}`;
   element.appendChild(errorEl);
-}
-
-function chunkArray<T>(arr: T[], size: number): T[][] {
-  const chunks: T[][] = [];
-  for (let i = 0; i < arr.length; i += size) {
-    chunks.push(arr.slice(i, i + size));
-  }
-  return chunks;
 }

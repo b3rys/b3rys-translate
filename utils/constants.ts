@@ -17,7 +17,11 @@ export const BUILD_TAG = '0.5.3';
 
 export const BATCH_SIZE = 15;
 export const VIEWPORT_BATCH_SIZE = 5;
-export const PARALLEL_BATCH_COUNT = 3;
+// Worker-pool size for the page-translation pipeline. One ordered queue
+// (viewport batches first) drained by this many concurrent workers — no phase
+// barriers. Kept modest so a burst can't blow past the background rate limiter
+// (150 calls/min); for normal pages total calls stay well under that.
+export const PIPELINE_CONCURRENCY = 6;
 export const MAX_TEXT_LENGTH = 5000;
 export const DEBOUNCE_DELAY = 500;
 export const MAX_RETRIES = 3;
