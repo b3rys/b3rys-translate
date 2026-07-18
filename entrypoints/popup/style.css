@@ -231,6 +231,26 @@ body {
 .popup > .section-engine {
   z-index: 30;
 }
+/* Cost section also hosts an info tooltip — needs to overlay sections below it */
+.popup > .section-cost {
+  position: relative;
+  z-index: 20;
+}
+
+/* Plain-text tooltip note (Cost estimate explanation) */
+.info-tooltip-note {
+  width: 244px;
+}
+.tt-desc {
+  display: block;
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+.tt-desc strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
 
 .info-trigger {
   position: relative;
