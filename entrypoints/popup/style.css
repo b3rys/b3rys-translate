@@ -515,6 +515,13 @@ body {
 
 .toggle-pair .toggle-compact {
   flex: 1;
+  min-width: 0;
+  /* Vertical cell so three toggles fit the 360px popup: label/status on top,
+     switch below — the horizontal layout can't fit a 40px switch + label in ~1/3 width. */
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
 }
 
 .toggle-row {

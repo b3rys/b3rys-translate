@@ -213,21 +213,21 @@ describe('TranslationStateMachine', () => {
       expect(deps.onStateChange).not.toHaveBeenCalled();
     });
 
-    it('circuit breaker trips after 15 observer-triggered starts', async () => {
+    it('circuit breaker trips after 30 productive starts', async () => {
       deps.translatePage.mockResolvedValue('done');
 
       // First via FAB (resets breaker, adds 1 start)
       await sm.onFabClick();
       expect(sm.state).toBe('done');
 
-      // 14 more via observer (adds 14 starts, total = 15)
-      for (let i = 0; i < 14; i++) {
+      // 29 more via observer (adds 29 starts, total = 30)
+      for (let i = 0; i < 29; i++) {
         sm.onObserverContent();
         await flushPromises();
         expect(sm.state).toBe('done');
       }
 
-      // 15th observer: recentStarts.length = 15 >= 15 → tripped
+      // 30th further start: recentStarts.length = 30 >= 30 → tripped
       sm.onObserverContent();
       await flushPromises();
       expect(sm.state).toBe('error');
@@ -252,9 +252,9 @@ describe('TranslationStateMachine', () => {
     it('FAB click resets circuit breaker', async () => {
       deps.translatePage.mockResolvedValue('done');
 
-      // Trip the breaker
+      // Trip the breaker (30 productive starts)
       await sm.onFabClick();
-      for (let i = 0; i < 14; i++) {
+      for (let i = 0; i < 29; i++) {
         sm.onObserverContent();
         await flushPromises();
       }

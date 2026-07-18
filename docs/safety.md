@@ -15,7 +15,7 @@
 │         │                                                           │
 │         ▼                                                           │
 │  ┌──────────────────────────────────────────┐                       │
-│  │  [1차] Circuit Breaker (15회/분)         │                       │
+│  │  [1차] Circuit Breaker (30회/분)         │                       │
 │  │  startTranslation() 호출 횟수 감시        │                       │
 │  │                                          │                       │
 │  │  통과 ──→ 번역 실행                       │                       │
@@ -125,9 +125,9 @@
   start start start start start start start start ...
   ──┼──┼──┼──┼──┼──┼──┼──┼──┼──┼──┼──┼──┼──┼──┼─→  ~30-40회/분
                                           ↑
-                              15회에서 차단! → error 상태
+                              30회에서 차단! → error 상태
 
-임계: 15회 시작 / 60초 (sliding window)
+임계: 30회 시작 / 60초 (sliding window)
 대상: startTranslation() 호출
 ```
 
