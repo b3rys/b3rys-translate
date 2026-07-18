@@ -319,6 +319,32 @@ describe('TranslationStateMachine', () => {
       expect(sm.state).toBe('done');
     });
 
+    it("'empty' pass keeps the persisted FAB state (sticky auto-translate)", async () => {
+      // Auto mode replays translationEnabled across navigations. A page with
+      // nothing to translate (Korean-only site) must NOT persist OFF, or one
+      // such page silently kills auto-translate for the rest of the browsing
+      // session.
+      deps.translatePage.mockResolvedValueOnce('empty');
+      deps.hasTranslationsOnPage.mockReturnValue(false);
+
+      await sm.onFabClick();
+      expect(sm.state).toBe('idle');
+      expect(deps.persistEnabled).not.toHaveBeenCalledWith(false);
+    });
+
+    it('navigation cancel does not persist OFF (only a FAB click does)', async () => {
+      const { promise, resolve } = await startPendingTranslation(sm, deps);
+      expect(sm.state).toBe('loading');
+
+      // handleToggle(false) is the navigation path (no persistEnabled inside)
+      sm.handleToggle(false);
+      deps.hasTranslationsOnPage.mockReturnValue(false);
+      resolve('cancelled');
+      await promise;
+
+      expect(deps.persistEnabled).not.toHaveBeenCalledWith(false);
+    });
+
     it("'added' during loading does NOT cancel — incremental pass after completion", async () => {
       const { promise, resolve } = await startPendingTranslation(sm, deps);
       expect(sm.state).toBe('loading');
