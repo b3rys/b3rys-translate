@@ -61,6 +61,21 @@ export default defineBackground(() => {
   loadCache();
   migrateStorage();
 
+  // The popup can reset usage or change the cost limit by writing storage.local
+  // directly. Adopt such external changes so the in-memory accumulator doesn't
+  // resurrect stale totals on its next flush. Our own flush writes match
+  // lastFlushedUsageJson and are ignored.
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local' || !changes[USAGE_STATS_KEY]) return;
+    const nv = changes[USAGE_STATS_KEY].newValue as UsageStats | undefined;
+    const json = nv ? JSON.stringify(nv) : '';
+    if (json !== lastFlushedUsageJson) {
+      usageStatsCache = nv ?? {};
+      lastFlushedUsageJson = json;
+      usageDirty = false; // storage is now authoritative
+    }
+  });
+
   chrome.runtime.onMessage.addListener(
     (
       message: BackgroundMessage,
@@ -126,9 +141,73 @@ function calculateCost(engineType: EngineType, usage: UsageData): number {
   );
 }
 
+// --- Usage/cost accounting (in-memory accumulator + debounced flush) ---
+// Writing stats on every batch (2 storage writes × ~56 batches on a long page)
+// was hammering storage — and in chrome.storage.sync it blew the 120/min write
+// quota, after which ALL sync writes (incl. unrelated settings like the FAB
+// on/off state and the Auto toggle) silently failed. Usage is per-device and
+// doesn't need to be real-time, so: accumulate in memory, persist to
+// storage.local at most once every few seconds. The accumulator also fixes a
+// pre-existing lost-update race (6 concurrent workers each did read-add-write,
+// clobbering each other → undercounted cost).
+const USAGE_FLUSH_DEBOUNCE_MS = 3000; // quiet period before writing
+const USAGE_FLUSH_MAX_MS = 15_000; // hard cap so a continuous burst still flushes
+
+let usageStatsCache: UsageStats | null = null;
+let usageFlushTimer: ReturnType<typeof setTimeout> | null = null;
+let usageFirstDirtyAt = 0;
+let usageDirty = false;
+let lastFlushedUsageJson = '';
+
 async function getUsageStats(): Promise<UsageStats> {
-  const data = await chrome.storage.sync.get(USAGE_STATS_KEY);
-  return (data[USAGE_STATS_KEY] as UsageStats) || {};
+  if (usageStatsCache) return usageStatsCache;
+  const data = await chrome.storage.local.get(USAGE_STATS_KEY);
+  usageStatsCache = (data[USAGE_STATS_KEY] as UsageStats) || {};
+  lastFlushedUsageJson = JSON.stringify(usageStatsCache);
+  return usageStatsCache;
+}
+
+/** Accumulate a batch's usage in memory and schedule a coalesced flush. */
+function recordUsage(engineType: EngineType, usage: UsageData): void {
+  const stats = usageStatsCache ?? (usageStatsCache = {});
+  const prev = stats[engineType] || {
+    inputTokens: 0,
+    outputTokens: 0,
+    estimatedCost: 0,
+    requestCount: 0,
+  };
+  stats[engineType] = {
+    inputTokens: prev.inputTokens + usage.inputTokens,
+    outputTokens: prev.outputTokens + usage.outputTokens,
+    estimatedCost: prev.estimatedCost + calculateCost(engineType, usage),
+    requestCount: prev.requestCount + 1,
+  };
+  scheduleUsageFlush();
+}
+
+function scheduleUsageFlush(): void {
+  usageDirty = true;
+  const now = Date.now();
+  if (!usageFirstDirtyAt) usageFirstDirtyAt = now;
+  if (usageFlushTimer) clearTimeout(usageFlushTimer);
+  const wait = Math.max(
+    0,
+    Math.min(USAGE_FLUSH_DEBOUNCE_MS, USAGE_FLUSH_MAX_MS - (now - usageFirstDirtyAt)),
+  );
+  usageFlushTimer = setTimeout(() => void flushUsage(), wait);
+}
+
+async function flushUsage(): Promise<void> {
+  if (usageFlushTimer) {
+    clearTimeout(usageFlushTimer);
+    usageFlushTimer = null;
+  }
+  if (!usageDirty || !usageStatsCache) return;
+  usageDirty = false;
+  usageFirstDirtyAt = 0;
+  lastFlushedUsageJson = JSON.stringify(usageStatsCache);
+  await chrome.storage.local.set({ [USAGE_STATS_KEY]: usageStatsCache });
+  await updateUsageRatio(usageStatsCache);
 }
 
 async function getTotalCost(stats: UsageStats): Promise<number> {
@@ -136,7 +215,7 @@ async function getTotalCost(stats: UsageStats): Promise<number> {
 }
 
 async function getCostLimit(): Promise<number | null> {
-  const data = await chrome.storage.sync.get(COST_LIMIT_KEY);
+  const data = await chrome.storage.local.get(COST_LIMIT_KEY);
   const val = data[COST_LIMIT_KEY];
   // null/undefined = no limit; number (including 0) = limit set
   return typeof val === 'number' ? val : null;
@@ -153,7 +232,7 @@ async function updateUsageRatio(stats: UsageStats): Promise<void> {
   } else {
     ratio = Math.min(totalCost / costLimit, 1);
   }
-  await chrome.storage.sync.set({ [USAGE_RATIO_KEY]: ratio });
+  await chrome.storage.local.set({ [USAGE_RATIO_KEY]: ratio });
 }
 
 /** Resolve the effective target language: message override > storage > default. */
@@ -244,22 +323,7 @@ async function handleTranslateBatch(
     const result = await engine.translate(apiKey, paragraphs, 'segment', undefined, lang);
 
     if (result.usage) {
-      const prev = stats[engineType] || {
-        inputTokens: 0,
-        outputTokens: 0,
-        estimatedCost: 0,
-        requestCount: 0,
-      };
-      const cost = calculateCost(engineType, result.usage);
-      const updated: EngineUsageStats = {
-        inputTokens: prev.inputTokens + result.usage.inputTokens,
-        outputTokens: prev.outputTokens + result.usage.outputTokens,
-        estimatedCost: prev.estimatedCost + cost,
-        requestCount: prev.requestCount + 1,
-      };
-      stats[engineType] = updated;
-      await chrome.storage.sync.set({ [USAGE_STATS_KEY]: stats });
-      await updateUsageRatio(stats);
+      recordUsage(engineType, result.usage);
     }
 
     const newTotal = await getTotalCost(stats);
@@ -306,24 +370,9 @@ async function handleTranslateBatch(
   }
   persistCache();
 
-  // Accumulate usage stats
+  // Accumulate usage stats (coalesced flush — see recordUsage)
   if (result.usage) {
-    const prev = stats[engineType] || {
-      inputTokens: 0,
-      outputTokens: 0,
-      estimatedCost: 0,
-      requestCount: 0,
-    };
-    const cost = calculateCost(engineType, result.usage);
-    const updated: EngineUsageStats = {
-      inputTokens: prev.inputTokens + result.usage.inputTokens,
-      outputTokens: prev.outputTokens + result.usage.outputTokens,
-      estimatedCost: prev.estimatedCost + cost,
-      requestCount: prev.requestCount + 1,
-    };
-    stats[engineType] = updated;
-    await chrome.storage.sync.set({ [USAGE_STATS_KEY]: stats });
-    await updateUsageRatio(stats);
+    recordUsage(engineType, result.usage);
   }
 
   const newTotal = await getTotalCost(stats);

@@ -339,8 +339,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   let costDetailsOpen = false;
 
-  // Load cost data
-  const costData = await chrome.storage.sync.get([USAGE_STATS_KEY, COST_LIMIT_KEY]);
+  // Load cost data (usage/cost lives in storage.local — sync's per-minute /
+  // per-hour write quota can't absorb the per-batch usage writes, and once it
+  // trips every sync write silently fails, incl. unrelated settings)
+  const costData = await chrome.storage.local.get([USAGE_STATS_KEY, COST_LIMIT_KEY]);
   const usageStats: UsageStats = (costData[USAGE_STATS_KEY] as UsageStats) || {};
   const savedLimit = costData[COST_LIMIT_KEY] as number | undefined; // undefined = no limit
 
@@ -411,7 +413,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Reset usage
   costReset.addEventListener('click', async () => {
     if (!confirm('Reset all usage stats?')) return;
-    await chrome.storage.sync.remove(USAGE_STATS_KEY);
+    await chrome.storage.local.remove(USAGE_STATS_KEY);
     // Recalculate ratio
     const hasLimit = costLimitInput.value !== '';
     const limitVal = parseFloat(costLimitInput.value);
@@ -423,7 +425,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     } else {
       ratio = 0; // usage reset to 0
     }
-    await chrome.storage.sync.set({ [USAGE_RATIO_KEY]: ratio });
+    await chrome.storage.local.set({ [USAGE_RATIO_KEY]: ratio });
     renderCostDisplay({});
   });
 
@@ -435,13 +437,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       const raw = costLimitInput.value.trim();
       if (raw === '') {
         // Empty = no limit
-        await chrome.storage.sync.remove(COST_LIMIT_KEY);
-        await chrome.storage.sync.set({ [USAGE_RATIO_KEY]: -1 });
+        await chrome.storage.local.remove(COST_LIMIT_KEY);
+        await chrome.storage.local.set({ [USAGE_RATIO_KEY]: -1 });
       } else {
         const val = parseFloat(raw) || 0;
-        await chrome.storage.sync.set({ [COST_LIMIT_KEY]: val });
+        await chrome.storage.local.set({ [COST_LIMIT_KEY]: val });
         // Update ratio
-        const data = await chrome.storage.sync.get(USAGE_STATS_KEY);
+        const data = await chrome.storage.local.get(USAGE_STATS_KEY);
         const stats: UsageStats = (data[USAGE_STATS_KEY] as UsageStats) || {};
         const total = calcTotalCost(stats);
         let ratio: number;
@@ -450,7 +452,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else {
           ratio = Math.min(total / val, 1);
         }
-        await chrome.storage.sync.set({ [USAGE_RATIO_KEY]: ratio });
+        await chrome.storage.local.set({ [USAGE_RATIO_KEY]: ratio });
         updateCostGauge(total);
       }
       if (raw === '') updateCostGauge(0);
