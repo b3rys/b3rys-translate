@@ -1,6 +1,13 @@
 import type { TextBlock, TranslationMode } from '@/types';
 import type { TranslateBatchResponse, CacheLookupResponse } from '@/utils/messaging';
-import { BATCH_SIZE, PIPELINE_CONCURRENCY, DATA_ATTRS, TRANSLATABLE_TAGS } from '@/utils/constants';
+import {
+  BATCH_SIZE,
+  PIPELINE_CONCURRENCY,
+  DATA_ATTRS,
+  TRANSLATABLE_TAGS,
+  LANG_STORAGE_KEY,
+  DEFAULT_TARGET_LANG,
+} from '@/utils/constants';
 import { getSiteRule } from '@/utils/site-rules';
 import { isFighting, recordInjection, resetFightGuard } from '@/utils/fight-guard';
 import { detectTextBlocks } from './text-detector';
@@ -307,6 +314,17 @@ function releaseUntranslatedClaims(): void {
  */
 export type TranslationResult = 'done' | 'cancelled' | 'empty';
 
+/** Current target language (storage) — fingerprint for reveal-in-place. */
+async function getTargetLang(): Promise<string> {
+  try {
+    const data = await chrome.storage.sync.get(LANG_STORAGE_KEY);
+    const stored = data[LANG_STORAGE_KEY] as { target?: string } | undefined;
+    return stored?.target || DEFAULT_TARGET_LANG;
+  } catch {
+    return DEFAULT_TARGET_LANG;
+  }
+}
+
 export async function translatePage(
   onProgress?: (completed: number, total: number) => void,
 ): Promise<TranslationResult> {
@@ -317,8 +335,30 @@ export async function translatePage(
   // the whole page: massive visible churn, and the breaker counts each pass
   // as productive work.
   if (document.body.classList.contains(HIDING_CLASS)) {
-    setDebugPhase('purge');
-    purgeAllTranslations();
+    // Toggle-ON with hidden translations: they were only CSS-hidden by
+    // toggle-off. If the target language hasn't changed, this is a TOGGLE,
+    // not a rebuild — reveal in place (single compensated class removal,
+    // instant even on 500-block card-heavy pages) and let the incremental
+    // detection below pick up anything genuinely new (BLOCK_IDs are intact,
+    // so an unchanged page resolves as a cheap 'empty' pass).
+    const currentLang = await getTargetLang();
+    const hiddenTranslations = document.querySelectorAll(`[${DATA_ATTRS.TRANSLATED}]`);
+    if (hiddenTranslations.length > 0 && document.body.dataset.b3rysLang === currentLang) {
+      setDebugPhase('reveal-in-place');
+      dbg('reveal-in-place: %d translations', hiddenTranslations.length);
+      const scroller = getScrollContainer(hiddenTranslations[0]);
+      withScrollCompensation(
+        scroller,
+        () => {
+          document.body.classList.remove(HIDING_CLASS);
+        },
+        Array.from(hiddenTranslations).map((el) => el.parentElement ?? el),
+      );
+    } else {
+      // Language changed (or nothing hidden) — stale translations must go.
+      setDebugPhase('purge');
+      purgeAllTranslations();
+    }
   }
 
   // Force scroll anchoring during translation — the browser keeps the viewport
@@ -360,6 +400,7 @@ export async function translatePage(
   completed += total - misses.length;
   if (completed > 0) onProgress?.(completed, total);
   if (misses.length === 0) {
+    document.body.dataset.b3rysLang = await getTargetLang();
     restoreScrollStyles();
     return 'done';
   }
@@ -377,6 +418,9 @@ export async function translatePage(
     onProgress?.(completed, total);
   });
 
+  if (result === 'done') {
+    document.body.dataset.b3rysLang = await getTargetLang();
+  }
   restoreScrollStyles();
   if (result === 'done' && getSiteRule()?.repaintAfterInject) {
     forceRepaint(misses[0]?.element);
