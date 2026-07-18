@@ -1,5 +1,4 @@
 import type { EngineType } from './engines/types';
-import { USAGE_STATS_KEY, COST_LIMIT_KEY, USAGE_RATIO_KEY } from './constants';
 
 export interface ExtensionSettings {
   selectedEngine: EngineType;
@@ -85,21 +84,9 @@ export async function migrateStorage(): Promise<void> {
     await chrome.storage.local.set({ engineApiKeys: localKeys });
   }
 
-  // Migrate usage stats from local → sync
-  const usageKeys = [USAGE_STATS_KEY, COST_LIMIT_KEY, USAGE_RATIO_KEY];
-  const localUsageData = await chrome.storage.local.get(usageKeys);
-  const keysToMigrate: Record<string, unknown> = {};
-  const keysToRemove: string[] = [];
-
-  for (const key of usageKeys) {
-    if (localUsageData[key] !== undefined) {
-      keysToMigrate[key] = localUsageData[key];
-      keysToRemove.push(key);
-    }
-  }
-
-  if (keysToRemove.length > 0) {
-    await chrome.storage.sync.set(keysToMigrate);
-    await chrome.storage.local.remove(keysToRemove);
-  }
+  // Note: usage/cost stats (USAGE_STATS_KEY, COST_LIMIT_KEY, USAGE_RATIO_KEY)
+  // live in chrome.storage.local. sync's write quota (120/min, 1800/hour) can't
+  // absorb the per-batch usage writes, and once it trips EVERY sync write
+  // silently fails — including unrelated settings (FAB on/off, Auto toggle).
+  // No pre-release users had synced usage data, so no back-migration is needed.
 }

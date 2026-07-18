@@ -157,8 +157,9 @@ export default defineContentScript({
       chrome.storage.sync.set({ translationMode: mode }).catch(() => {});
     });
 
-    // Load initial usage gauge
-    chrome.storage.sync
+    // Load initial usage gauge (usage/cost lives in storage.local — see
+    // usage-storage note: sync's write quota can't take per-batch writes)
+    chrome.storage.local
       .get(USAGE_RATIO_KEY)
       .then((data) => {
         const ratio = data[USAGE_RATIO_KEY] as number | undefined;
@@ -166,14 +167,16 @@ export default defineContentScript({
       })
       .catch(() => {});
 
-    // Listen for storage changes from other tabs
+    // Listen for storage changes from other tabs. Usage ratio is in `local`;
+    // the prefs below are in `sync` — dispatch by area, don't early-return.
     chrome.storage.onChanged.addListener((changes, area) => {
-      if (area !== 'sync') return;
-
-      if (changes[USAGE_RATIO_KEY]) {
-        const ratio = changes[USAGE_RATIO_KEY].newValue as number;
-        fab.setUsageGauge(ratio);
+      if (area === 'local') {
+        if (changes[USAGE_RATIO_KEY]) {
+          fab.setUsageGauge(changes[USAGE_RATIO_KEY].newValue as number);
+        }
+        return;
       }
+      if (area !== 'sync') return;
 
       // Sync translation mode across tabs (live, no refresh needed)
       if (changes.translationMode) {
