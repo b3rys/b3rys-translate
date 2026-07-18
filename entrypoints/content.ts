@@ -215,22 +215,31 @@ export default defineContentScript({
       }
       if (message.type === 'TOGGLE_AUTO_TRANSLATE') {
         autoTranslate = message.enabled;
-        // Turning on translates the page you're looking at right now.
-        // Turning off leaves current translations as-is (toggle FAB to remove).
+        // Turning on replays the remembered FAB state on the current page
+        // (translates only if the FAB was last ON). Turning off leaves current
+        // translations as-is (toggle FAB to remove).
         if (message.enabled) void autoTranslateCurrentPage();
       }
     });
 
-    // --- Auto-translate: opt-in "translate every page I browse" ---
-    // Off by default (has API cost). When on, the current page auto-translates
-    // and each navigation re-translates the new page. Silently skips when no API
-    // key is set — never nags the popup open on every page load.
+    // --- Auto-translate: opt-in "FAB state follows me across pages" ---
+    // Off by default (has API cost). When on, the FAB's last on/off intent
+    // (persisted as `translationEnabled` by the state machine) carries over to
+    // every navigation: FAB ON → each new page auto-translates; FAB OFF → pages
+    // stay untranslated until the user turns the FAB on again. Without auto
+    // mode every page starts OFF regardless. Silently skips when no API key is
+    // set — never nags the popup open on every page load.
     let autoTranslate = false;
 
     async function autoTranslateCurrentPage(): Promise<void> {
       if (!autoTranslate || isMarkedInvalidated()) return;
       if (!(await hasApiKeyStored())) return; // no key → stay quiet
-      await sm.autoTranslateIfEnabled(true);
+      const { translationEnabled } = await chrome.storage.sync.get<{
+        translationEnabled?: boolean;
+      }>('translationEnabled');
+      // Unset (never clicked the FAB) counts as ON — enabling auto mode should
+      // just work for a fresh install.
+      await sm.autoTranslateIfEnabled(translationEnabled !== false);
     }
 
     // Re-translate after an in-page (SPA) navigation. Falls back to the plain

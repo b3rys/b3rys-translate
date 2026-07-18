@@ -190,9 +190,12 @@ export class TranslationStateMachine {
           await this.startTranslation();
           return;
         }
+        // NOTE: no persistEnabled(false) here — a user-initiated cancel already
+        // persisted OFF in onFabClick's loading branch. Reaching this line via a
+        // navigation cancel (handleToggle during auto mode) must not clobber the
+        // sticky FAB state that the next page's auto pass is about to read.
         this.setState(this.deps.hasTranslationsOnPage() ? 'done' : 'idle');
         this.deps.onProgress(0);
-        await this.deps.persistEnabled(false);
         return;
       }
 
@@ -209,12 +212,11 @@ export class TranslationStateMachine {
           await this.startTranslation();
           return;
         }
-        if (this.deps.hasTranslationsOnPage()) {
-          this.setState('done');
-        } else {
-          this.setState('idle');
-          await this.deps.persistEnabled(false);
-        }
+        // NOTE: do NOT persistEnabled(false) here. An empty pass is "nothing
+        // to translate on this page" (e.g. a Korean-only page), not a user
+        // intent change — auto mode replays the persisted FAB state across
+        // navigations, and a single untranslatable page must not switch it off.
+        this.setState(this.deps.hasTranslationsOnPage() ? 'done' : 'idle');
         return;
       }
 
