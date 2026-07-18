@@ -70,6 +70,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   const fabStatusText = document.getElementById('fab-status') as HTMLSpanElement;
   const ytBtnToggle = document.getElementById('yt-btn-toggle') as HTMLInputElement;
   const ytBtnStatusText = document.getElementById('yt-btn-status') as HTMLSpanElement;
+  const autoToggle = document.getElementById('auto-toggle') as HTMLInputElement;
+  const autoStatusText = document.getElementById('auto-status') as HTMLSpanElement;
   const badgeModel = document.querySelector('.badge-model') as HTMLSpanElement;
   const badgeLink = document.getElementById('badge-link') as HTMLAnchorElement;
   const keyIssueLink = document.getElementById('key-issue-link') as HTMLAnchorElement;
@@ -78,11 +80,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   const dismissError = document.getElementById('dismiss-error') as HTMLButtonElement;
 
   // Load saved settings (API keys from local, rest from sync)
-  const { selectedEngine, floatingButtonVisible, ytButtonVisible } = await chrome.storage.sync.get<{
-    selectedEngine?: EngineType;
-    floatingButtonVisible?: boolean;
-    ytButtonVisible?: boolean;
-  }>(['selectedEngine', 'floatingButtonVisible', 'ytButtonVisible']);
+  const { selectedEngine, floatingButtonVisible, ytButtonVisible, autoTranslate } =
+    await chrome.storage.sync.get<{
+      selectedEngine?: EngineType;
+      floatingButtonVisible?: boolean;
+      ytButtonVisible?: boolean;
+      autoTranslate?: boolean;
+    }>(['selectedEngine', 'floatingButtonVisible', 'ytButtonVisible', 'autoTranslate']);
 
   const { engineApiKeys } = await chrome.storage.local.get<{
     engineApiKeys?: Partial<Record<EngineType, string>>;
@@ -162,6 +166,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   ytBtnToggle.checked = isYtBtnVisible;
   updateYtBtnStatus(isYtBtnVisible);
 
+  const isAutoOn = autoTranslate === true;
+  autoToggle.checked = isAutoOn;
+  updateAutoStatus(isAutoOn);
+
   // Engine selection change
   engineSelect.addEventListener('change', async () => {
     const engine = engineSelect.value as EngineType;
@@ -237,6 +245,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
+  // Toggle auto-translate (translate every page automatically)
+  autoToggle.addEventListener('change', async () => {
+    const enabled = autoToggle.checked;
+    await chrome.storage.sync.set({ autoTranslate: enabled });
+    updateAutoStatus(enabled);
+
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab?.id) {
+      chrome.tabs.sendMessage(tab.id, {
+        type: 'TOGGLE_AUTO_TRANSLATE',
+        enabled,
+      });
+    }
+  });
+
   function loadKeyForEngine(engine: EngineType) {
     const savedKey = keys[engine];
     if (savedKey) {
@@ -271,6 +294,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   function updateYtBtnStatus(visible: boolean) {
     ytBtnStatusText.textContent = visible ? 'Visible' : 'Hidden';
     ytBtnStatusText.className = visible ? 'toggle-status-text' : 'toggle-status-text inactive';
+  }
+
+  function updateAutoStatus(on: boolean) {
+    autoStatusText.textContent = on ? 'On' : 'Off';
+    autoStatusText.className = on ? 'toggle-status-text' : 'toggle-status-text inactive';
   }
 
   // --- Cache section ---

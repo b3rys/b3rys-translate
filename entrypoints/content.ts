@@ -23,6 +23,17 @@ import type { ContentMessage } from '@/utils/messaging';
 import { SKIP_HOSTS, USAGE_RATIO_KEY, BUILD_TAG } from '@/utils/constants';
 import { TranslationStateMachine } from '@/utils/translation-state';
 
+/** Does the currently-selected engine have an API key saved? (no side effects) */
+async function hasApiKeyStored(): Promise<boolean> {
+  const { selectedEngine } = await chrome.storage.sync.get<{ selectedEngine?: string }>(
+    'selectedEngine',
+  );
+  const { engineApiKeys } = await chrome.storage.local.get<{
+    engineApiKeys?: Record<string, string>;
+  }>('engineApiKeys');
+  return !!engineApiKeys?.[selectedEngine || 'gemini'];
+}
+
 export default defineContentScript({
   matches: ['<all_urls>'],
   runAt: 'document_idle',
@@ -63,14 +74,7 @@ export default defineContentScript({
       setTranslationMode,
       checkApiKey: async () => {
         try {
-          const { selectedEngine } = await chrome.storage.sync.get<{
-            selectedEngine?: string;
-          }>('selectedEngine');
-          const { engineApiKeys } = await chrome.storage.local.get<{
-            engineApiKeys?: Record<string, string>;
-          }>('engineApiKeys');
-          const engine = selectedEngine || 'gemini';
-          const hasKey = !!engineApiKeys?.[engine];
+          const hasKey = await hasApiKeyStored();
           if (!hasKey) {
             // First-run onboarding: the popup we're about to open should
             // explain WHY it opened and point at the key-issuance link.
@@ -179,6 +183,13 @@ export default defineContentScript({
           setTranslationMode(mode);
         }
       }
+
+      // Sync auto-translate flag across tabs. Only update the flag here —
+      // don't auto-translate background tabs (the active tab is handled by the
+      // TOGGLE_AUTO_TRANSLATE message); other tabs translate on their next nav.
+      if (changes.autoTranslate) {
+        autoTranslate = changes.autoTranslate.newValue === true;
+      }
     });
 
     // Listen for toggles from popup
@@ -201,15 +212,52 @@ export default defineContentScript({
           destroySelectionPopup();
         }
       }
+      if (message.type === 'TOGGLE_AUTO_TRANSLATE') {
+        autoTranslate = message.enabled;
+        // Turning on translates the page you're looking at right now.
+        // Turning off leaves current translations as-is (toggle FAB to remove).
+        if (message.enabled) void autoTranslateCurrentPage();
+      }
     });
+
+    // --- Auto-translate: opt-in "translate every page I browse" ---
+    // Off by default (has API cost). When on, the current page auto-translates
+    // and each navigation re-translates the new page. Silently skips when no API
+    // key is set — never nags the popup open on every page load.
+    let autoTranslate = false;
+
+    async function autoTranslateCurrentPage(): Promise<void> {
+      if (!autoTranslate || isMarkedInvalidated()) return;
+      if (!(await hasApiKeyStored())) return; // no key → stay quiet
+      await sm.autoTranslateIfEnabled(true);
+    }
+
+    // Re-translate after an in-page (SPA) navigation. Falls back to the plain
+    // "reset to off" behavior when auto-translate is disabled.
+    function handleNavigation(): void {
+      if (autoTranslate) {
+        sm.handleToggle(false); // clear the previous page's translations first
+        void autoTranslateCurrentPage();
+      } else {
+        // Reset translation state for new page — user clicks FAB to translate again
+        sm.handleToggle(false);
+      }
+    }
+
+    chrome.storage.sync
+      .get<{ autoTranslate?: boolean }>('autoTranslate')
+      .then(({ autoTranslate: on }) => {
+        autoTranslate = on === true;
+        if (autoTranslate) void autoTranslateCurrentPage();
+      })
+      .catch(() => {});
 
     // Detect SPA navigation via URL polling
     // (history.pushState patching doesn't work from content script's isolated world)
     setInterval(() => {
       if (location.href !== lastUrl) {
         lastUrl = location.href;
-        // Reset translation state for new page — user clicks FAB to translate again
-        sm.handleToggle(false);
+        handleNavigation();
       }
     }, 500);
 
@@ -217,7 +265,7 @@ export default defineContentScript({
     window.addEventListener('popstate', () => {
       if (location.href !== lastUrl) {
         lastUrl = location.href;
-        sm.handleToggle(false);
+        handleNavigation();
       }
     });
 
@@ -228,9 +276,7 @@ export default defineContentScript({
       sm.onObserverContent(kind);
     });
 
-    // Auto-translate on page load is disabled — default is always OFF.
-    // User clicks FAB to translate. The autoTranslateIfEnabled() method
-    // and persistEnabled() calls in the state machine are preserved for
-    // future opt-in auto-translate feature.
+    // Auto-translate is opt-in (default OFF) — wired above via the
+    // `autoTranslate` flag, the storage load, and handleNavigation().
   },
 });

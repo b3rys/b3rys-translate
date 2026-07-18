@@ -35,6 +35,11 @@ export interface ToggleTranslationModeMessage {
   mode: 'parallel' | 'replace';
 }
 
+export interface ToggleAutoTranslateMessage {
+  type: 'TOGGLE_AUTO_TRANSLATE';
+  enabled: boolean;
+}
+
 /**
  * Pure cache read — no API call, no rate-limit slot, no usage stats.
  * Lets the content script paint cached paragraphs instantly and send
@@ -71,4 +76,5 @@ export type ContentMessage =
   | ToggleTranslationMessage
   | ToggleFloatingButtonMessage
   | ToggleYtButtonMessage
-  | ToggleTranslationModeMessage;
+  | ToggleTranslationModeMessage
+  | ToggleAutoTranslateMessage;
