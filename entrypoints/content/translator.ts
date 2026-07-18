@@ -601,7 +601,10 @@ async function injectCachedTranslations(blocks: TextBlock[], gen: number): Promi
       // the 16ms frame on heavy pages (claude.com ≈ 500 blocks) → stutter on
       // every chunk. Spend at most FRAME_BUDGET_MS per frame, then yield —
       // heavy pages just take more frames, each one stays smooth.
-      const FRAME_BUDGET_MS = 8;
+      // Hidden (bulk-reveal) injection can't jank anything visible — spend a
+      // much bigger budget so a fully-cached 500-block page paints in ~1s
+      // instead of 3-4s (users read that spinner as "re-translating").
+      const FRAME_BUDGET_MS = bulkReveal ? 28 : 8;
       let i = 0;
       while (i < hitBlocks.length) {
         if (gen !== translateGen) return [];
@@ -623,11 +626,17 @@ async function injectCachedTranslations(blocks: TextBlock[], gen: number): Promi
           );
         }
         if (i < hitBlocks.length) {
-          // rAF keeps slices frame-aligned; fall back to a timer in hidden tabs
-          // (rAF never fires there and would hang the pass).
-          await new Promise((r) =>
-            document.hidden ? setTimeout(r, 0) : requestAnimationFrame(() => r(undefined)),
-          );
+          // Yield via race(rAF, timer): rAF alone stalls in hidden AND
+          // occluded windows (macOS occlusion throttling) — observed as a
+          // fully-cached pass crawling at a few blocks/second. The timer
+          // guarantees progress; rAF wins when the tab is actually painting.
+          await new Promise((r) => {
+            const t = setTimeout(r, 40);
+            requestAnimationFrame(() => {
+              clearTimeout(t);
+              r(undefined);
+            });
+          });
         }
       }
     } finally {

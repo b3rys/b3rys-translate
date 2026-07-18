@@ -40,9 +40,8 @@ export default defineContentScript({
   runAt: 'document_idle',
 
   main() {
-    // Identify the running bundle — rebuilds without an extension reload +
-    // page refresh keep executing the old content script silently.
-    console.log(`[b3rys] content script ${BUILD_TAG}`);
+    // Identify the running bundle (debug mode only — default console is silent).
+    dbg(`content script ${BUILD_TAG}`);
     // Initialize YouTube dual subtitles if on YouTube
     if (location.hostname === 'www.youtube.com') {
       import('./content/youtube/youtube-controller').then(({ initYouTubeSubtitles }) => {

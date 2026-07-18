@@ -1,6 +1,6 @@
 {
   "name": "b3rys-translate",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "description": "Bilingual translation Chrome extension — original text with translation below, plus YouTube dual subtitles",
   "type": "module",
   "license": "Apache-2.0",
