@@ -63,6 +63,10 @@
 - [x] 콘솔 침묵 (기본 무로그, `localStorage.b3rys_debug='1'`로만 디버그)
 - [x] 배포 전 인수테스트 게이트 (docs/release-checklist.md)
 - [x] Auto 모드 = 둥둥이 상태 유지 (FAB OFF면 페이지 이동해도 번역 안 함 · empty/cancelled 패스의 sticky 오염 제거) (#10)
+- [x] 사용량 통계 저장소 sync→local + 디바운스 플러시 (배치마다 sync 쓰기 → quota 폭주 차단) (#12)
+- [x] **모든 설정 저장소 sync→local 통일** (sync 쓰기 quota 터지면 전 설정 저장 마비되던 근본 버그 차단 · onChanged 전부 local · sync 미사용) (#13)
+- [x] 둥둥이 '새로고침하세요' 말풍선 깜박임 제거 (#13)
+- [x] v0.5.6 버전 bump
 
 > 범례: `[x]` 완료 · `[~]` 진행중 · `[ ]` 미착수
 
