@@ -81,6 +81,9 @@ function pickSourceTrack(tracks: CaptionTrack[], lang: string): CaptionTrack | n
   return manual ?? matched[0];
 }
 
+/** Downloaded cues plus the kind of captions they actually are. */
+export type SubtitleDownload = { cues: SubtitleCue[]; isAsr: boolean };
+
 /**
  * Download subtitle cues.
  * Strategy 1: Check intercepted timedtext data (from YouTube's own requests)
@@ -90,31 +93,33 @@ function pickSourceTrack(tracks: CaptionTrack[], lang: string): CaptionTrack | n
 export async function downloadSubtitles(
   track: CaptionTrack,
   videoId: string | null = getVideoId(),
-): Promise<SubtitleCue[]> {
+): Promise<SubtitleDownload> {
   console.log('[b3rys] Track:', track.languageCode, track.kind ?? 'manual');
+  const query: TrackQuery = { lang: track.languageCode, kind: track.kind };
 
   // Strategy 1: Already intercepted?
-  let text = checkInterceptedData(track.languageCode, videoId);
-  if (text) {
-    console.log(`[b3rys] Using intercepted data: length=${text.length}`);
+  const hit = findInterceptedTrack(query, videoId);
+  if (hit) {
+    console.log(`[b3rys] Using intercepted data: length=${hit.text.length}`);
     // An unparseable payload must not dead-end the pipeline — drop it and let the
     // remaining strategies run instead of throwing out of downloadSubtitles.
-    const cues = tryParse(text);
-    if (cues) return cues;
-    dropInterceptedTrack(text);
+    const cues = tryParse(hit.text);
+    if (cues) return asDownload(cues, hit);
+    dropInterceptedTrack(hit.text);
   }
 
   // Strategy 2: Wait for YouTube's own subtitle loading
   console.log('[b3rys] Waiting for YouTube timedtext interception...');
-  text = await waitForInterception(track.languageCode, videoId, 5000);
-  if (text) {
-    console.log(`[b3rys] Got intercepted data: length=${text.length}`);
-    const cues = tryParse(text);
-    if (cues) return cues;
-    dropInterceptedTrack(text);
+  const waited = await waitForInterception(query, videoId, 5000);
+  if (waited) {
+    console.log(`[b3rys] Got intercepted data: length=${waited.text.length}`);
+    const cues = tryParse(waited.text);
+    if (cues) return asDownload(cues, waited);
+    dropInterceptedTrack(waited.text);
   }
 
-  // Strategy 3: Direct fetch via bridge
+  // Strategy 3: Direct fetch via bridge — this is the picked track itself,
+  // so its kind is authoritative.
   const sep = track.baseUrl.includes('?') ? '&' : '?';
   const urls = [track.baseUrl + sep + 'fmt=json3', track.baseUrl];
   for (const url of urls) {
@@ -122,7 +127,7 @@ export async function downloadSubtitles(
     try {
       const result = await bridgeFetch(url);
       console.log(`[b3rys] Direct fetch response: length=${result.length}`);
-      if (result) return parseSubtitleResponse(result);
+      if (result) return { cues: parseSubtitleResponse(result), isAsr: isAsrKind(track.kind) };
     } catch (err) {
       console.warn('[b3rys] Direct fetch failed:', err);
     }
@@ -131,9 +136,26 @@ export async function downloadSubtitles(
   throw new Error('All subtitle fetch strategies failed');
 }
 
+/**
+ * Post-processing depends on the kind of captions actually received, not on the
+ * track that was requested: YouTube may have loaded the auto-generated track
+ * while we picked the manual one. Treating ASR fragments as manual captions
+ * skips merging and renders 2–3 word shards.
+ */
+function asDownload(cues: SubtitleCue[], entry: InterceptedTrack): SubtitleDownload {
+  const isAsr = isAsrKind(entry.kind);
+  console.log(`[b3rys] Payload kind: ${isAsr ? 'asr' : 'manual'} (lang=${entry.lang})`);
+  return { cues, isAsr };
+}
+
 // ===================== Timedtext interception =====================
 
-type InterceptedTrack = { videoId: string | null; lang: string | null; text: string };
+type InterceptedTrack = {
+  videoId: string | null;
+  lang: string | null;
+  kind: string | null;
+  text: string;
+};
 
 /**
  * Timedtext payloads intercepted from YouTube's own requests, keyed by request URL.
@@ -153,10 +175,13 @@ function urlParam(url: string, key: string): string | null {
 
 export function recordInterceptedTrack(url: string, text: string): void {
   interceptedData.set(url, {
-    // The timedtext URL carries the video id; fall back to the page's current
-    // video if YouTube ever omits it.
-    videoId: urlParam(url, 'v') ?? getVideoId(),
+    // Tagged from the URL only. Falling back to the page's current video would
+    // stamp a payload that may belong to another video (YouTube prefetches the
+    // autoplay-next captions) — a wrong tag serves wrong subtitles, while an
+    // untagged entry is merely unusable and falls through to a direct fetch.
+    videoId: urlParam(url, 'v'),
     lang: urlParam(url, 'lang'),
+    kind: urlParam(url, 'kind'),
     text,
   });
 }
@@ -175,24 +200,57 @@ export function pruneInterceptedTracks(keepVideoId: string | null): void {
   }
 }
 
-function matchesTrack(
-  url: string,
-  entry: InterceptedTrack,
-  lang: string,
-  videoId: string | null,
-): boolean {
-  if (entry.videoId !== videoId) return false;
+/** What the caller is looking for: a caption track's language and kind. */
+export type TrackQuery = { lang: string; kind?: string };
+
+const normLang = (lang: string | null | undefined) => (lang ?? '').toLowerCase();
+/** YouTube marks auto-generated tracks with kind=asr; manual tracks carry no kind. */
+const isAsrKind = (kind: string | null | undefined) => kind === 'asr';
+
+function isUsable(url: string, entry: InterceptedTrack, videoId: string | null): boolean {
+  if (!videoId || entry.videoId !== videoId) return false;
   // Responses carrying tlang= are YouTube's own auto-translation, not source captions.
-  if (urlParam(url, 'tlang')) return false;
-  return baseLanguage(entry.lang ?? '') === baseLanguage(lang);
+  return !urlParam(url, 'tlang');
 }
 
-export function checkInterceptedData(lang: string, videoId: string | null): string | null {
+/**
+ * How well a payload answers the query — lower is better, null means unusable.
+ *
+ * Locale-exact beats base-language so `zh-Hant` never receives a `zh-Hans`
+ * payload, while `en` still accepts `en-CA`. Same-kind beats other-kind because
+ * ASR and manual captions need different post-processing (ASR arrives as 2–3
+ * word fragments); when only the other kind is cached it is still usable — the
+ * caller is told which kind it actually got.
+ */
+function rankTrack(entry: InterceptedTrack, query: TrackQuery): number | null {
+  const langExact = normLang(entry.lang) === normLang(query.lang);
+  const langBase = baseLanguage(entry.lang ?? '') === baseLanguage(query.lang);
+  if (!langExact && !langBase) return null;
+  const kindSame = isAsrKind(entry.kind) === isAsrKind(query.kind);
+  return (kindSame ? 0 : 2) + (langExact ? 0 : 1);
+}
+
+/** Best intercepted payload for the query, or null. Newest wins ties. */
+export function findInterceptedTrack(
+  query: TrackQuery,
+  videoId: string | null,
+): InterceptedTrack | null {
+  let best: InterceptedTrack | null = null;
+  let bestRank = Number.POSITIVE_INFINITY;
   // Newest first — a re-request for the same track supersedes earlier payloads.
   for (const [url, entry] of [...interceptedData].reverse()) {
-    if (matchesTrack(url, entry, lang, videoId)) return entry.text;
+    if (!isUsable(url, entry, videoId)) continue;
+    const rank = rankTrack(entry, query);
+    if (rank === null || rank >= bestRank) continue;
+    best = entry;
+    bestRank = rank;
   }
-  return null;
+  return best;
+}
+
+/** Test seam: empty the map regardless of how entries are tagged. */
+export function clearInterceptedTracks(): void {
+  interceptedData.clear();
 }
 
 window.addEventListener('message', (e: MessageEvent) => {
@@ -202,12 +260,12 @@ window.addEventListener('message', (e: MessageEvent) => {
 });
 
 function waitForInterception(
-  lang: string,
+  query: TrackQuery,
   videoId: string | null,
   timeout: number,
-): Promise<string | null> {
+): Promise<InterceptedTrack | null> {
   return new Promise((resolve) => {
-    const existing = checkInterceptedData(lang, videoId);
+    const existing = findInterceptedTrack(query, videoId);
     if (existing) {
       resolve(existing);
       return;
@@ -218,7 +276,7 @@ function waitForInterception(
       // The module-level listener records first, but re-record defensively so a
       // listener-ordering change can't strand this wait until timeout.
       recordInterceptedTrack(e.data.url ?? '', e.data.text);
-      const match = checkInterceptedData(lang, videoId);
+      const match = findInterceptedTrack(query, videoId);
       if (!match) return;
       window.removeEventListener('message', handler);
       clearTimeout(timer);

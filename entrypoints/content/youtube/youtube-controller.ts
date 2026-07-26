@@ -71,6 +71,9 @@ export function initYouTubeSubtitles(): void {
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local' || !changes[LANG_STORAGE_KEY]) return;
     if (!isActive || !activeVideoId || !activeCues || !abortController) return;
+    // Never restart translation for a video the user has already left — that
+    // would spend API calls on the previous video and fill its cache bucket.
+    if (activeVideoId !== getVideoId()) return;
 
     // Clear subtitle cache for current video and restart translation
     clearTranslations(activeVideoId);
@@ -283,7 +286,7 @@ async function handleButtonClick(): Promise<void> {
     const targetLang = await getTargetLanguage();
     const sourceOnly = baseLanguage(track.languageCode) === baseLanguage(targetLang);
 
-    const cues = await downloadSubtitles(track, videoId);
+    const { cues, isAsr } = await downloadSubtitles(track, videoId);
     if (signal.aborted) return;
 
     if (cues.length === 0) {
@@ -295,8 +298,10 @@ async function handleButtonClick(): Promise<void> {
     }
 
     // Manual subtitles: already well-formatted → use as-is (just apply LEAD + duration chain)
-    // ASR subtitles: tiny fragments → need heuristic merge
-    const isManual = track.kind !== 'asr';
+    // ASR subtitles: tiny fragments → need heuristic merge.
+    // Keyed off what was actually downloaded, not the track we asked for — YouTube
+    // may have loaded the auto-generated track while we picked the manual one.
+    const isManual = !isAsr;
     let merged: SubtitleCue[];
     if (isManual) {
       merged = postProcessCues(cues, 85, 0.1);
