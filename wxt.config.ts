@@ -14,6 +14,7 @@ export default defineConfig({
       'https://generativelanguage.googleapis.com/*',
       'https://api.openai.com/*',
       'https://api.anthropic.com/*',
+      'https://api.upstage.ai/*',
       'https://www.youtube.com/*',
       '<all_urls>',
     ],

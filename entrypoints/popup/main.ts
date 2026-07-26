@@ -16,6 +16,7 @@ const ENGINE_KEY_URLS: Record<EngineType, string> = {
   gemini: 'https://aistudio.google.com/apikey',
   openai: 'https://platform.openai.com/api-keys',
   anthropic: 'https://console.anthropic.com/settings/keys',
+  upstage: 'https://console.upstage.ai/api-keys',
 };
 
 // 엔진 비교 툴팁용 한줄 설명 (가격은 ENGINE_PRICING 단일 출처에서 파생)
@@ -23,6 +24,7 @@ const ENGINE_NOTES: Record<EngineType, string> = {
   gemini: '무료 할당량·권장',
   openai: '최저가·비추론',
   anthropic: '품질 우선',
+  upstage: '최저가·한국어 특화',
 };
 
 /** 팝업 엔진 목록/툴팁을 ENGINE_DISPLAY_NAMES + ENGINE_PRICING에서 생성 (엔진 추가 시 이 데이터만 갱신) */

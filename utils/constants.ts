@@ -3,12 +3,14 @@ export const ENGINE_ENDPOINTS = {
     'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent',
   openai: 'https://api.openai.com/v1/chat/completions',
   anthropic: 'https://api.anthropic.com/v1/messages',
+  upstage: 'https://api.upstage.ai/v1/chat/completions',
 } as const;
 
 export const ENGINE_MODELS = {
   gemini: 'gemini-3.1-flash-lite',
   openai: 'gpt-4.1-nano',
   anthropic: 'claude-haiku-4-5-20251001',
+  upstage: 'solar-mini',
 } as const;
 
 /** Logged at content-script startup so the running bundle can be identified
@@ -102,6 +104,7 @@ export const ENGINE_PRICING: Record<string, { input: number; output: number; uni
   gemini: { input: 0.25, output: 1.5, unit: 'tokens' },
   openai: { input: 0.1, output: 0.4, unit: 'tokens' },
   anthropic: { input: 1.0, output: 5.0, unit: 'tokens' },
+  upstage: { input: 0.05, output: 0.2, unit: 'tokens' },
 };
 
 // Usage stats storage key
