@@ -97,23 +97,26 @@ export async function downloadSubtitles(
 ): Promise<SubtitleDownload> {
   console.log('[b3rys] Track:', track.languageCode, track.kind ?? 'manual');
   const query: TrackQuery = { lang: track.languageCode, kind: track.kind };
+  const triedUrls = new Set<string>();
 
-  // Strategy 1: Already intercepted?
-  const hit = findInterceptedTrack(query, videoId);
-  if (hit) {
-    console.log(`[b3rys] Using intercepted data: length=${hit.text.length}`);
-    // An unparseable payload must not dead-end the pipeline — drop it and let the
-    // remaining strategies run instead of throwing out of downloadSubtitles.
-    const cues = tryParse(hit.text);
-    if (cues) return asDownload(cues, hit);
-    dropInterceptedTrack(hit.text);
-  }
+  // Strategies 1+2 over whatever has been intercepted so far.
+  const fromInterceptions = async (): Promise<SubtitleDownload | null> => {
+    // 1: an interception of the track itself.
+    const hit = findInterceptedTrack(query, videoId);
+    if (hit) {
+      console.log(`[b3rys] Using intercepted data: length=${hit.text.length}`);
+      // An unparseable payload must not dead-end the pipeline — drop it and let the
+      // remaining strategies run instead of throwing out of downloadSubtitles.
+      const cues = tryParse(hit.text);
+      if (cues) return asDownload(cues, hit);
+      dropInterceptedTrack(hit.text);
+    }
 
-  // Strategy 2: YouTube already requested *some* track for this video — borrow its
-  // token and ask for the one we actually want. Tried before the 5s wait because
-  // waiting only helps if YouTube happens to load our language on its own.
-  const tokenized = tokenizedUrlFor(query, videoId);
-  if (tokenized) {
+    // 2: YouTube loaded some *other* track for this video — borrow its token and
+    // ask for the one we want.
+    const tokenized = tokenizedUrlFor(query, videoId);
+    if (!tokenized || triedUrls.has(tokenized)) return null;
+    triedUrls.add(tokenized);
     console.log('[b3rys] Re-targeting an intercepted URL to', `${query.lang}/${queryKind(query)}`);
     try {
       const result = await bridgeFetch(tokenized);
@@ -123,16 +126,19 @@ export async function downloadSubtitles(
     } catch (err) {
       console.warn('[b3rys] Re-targeted fetch failed:', err);
     }
-  }
+    return null;
+  };
 
-  // Strategy 3: Wait for YouTube's own subtitle loading
+  const cached = await fromInterceptions();
+  if (cached) return cached;
+
+  // Strategy 3: nothing intercepted yet — captions load ~1s after we ask YouTube to
+  // turn them on. Wait for ANY payload for this video (not just our language: a
+  // different one still carries the token), then retry the strategies above.
   console.log('[b3rys] Waiting for YouTube timedtext interception...');
-  const waited = await waitForInterception(query, videoId, 5000);
-  if (waited) {
-    console.log(`[b3rys] Got intercepted data: length=${waited.text.length}`);
-    const cues = tryParse(waited.text);
-    if (cues) return asDownload(cues, waited);
-    dropInterceptedTrack(waited.text);
+  if (await waitForAnyInterception(videoId, 5000)) {
+    const afterWait = await fromInterceptions();
+    if (afterWait) return afterWait;
   }
 
   // Strategy 4: Direct fetch via bridge — this is the picked track itself,
@@ -325,15 +331,18 @@ window.addEventListener('message', (e: MessageEvent) => {
   recordInterceptedTrack(e.data.url ?? '', e.data.text);
 });
 
-function waitForInterception(
-  query: TrackQuery,
-  videoId: string | null,
-  timeout: number,
-): Promise<InterceptedTrack | null> {
+/**
+ * Resolve once YouTube has loaded captions for this video — in ANY language.
+ * A different language is still useful: it carries the per-video token, so the
+ * caller can re-target it (see `tokenizedUrlFor`).
+ */
+function waitForAnyInterception(videoId: string | null, timeout: number): Promise<boolean> {
+  const hasPayload = () =>
+    [...interceptedData.values()].some((entry) => videoId && entry.videoId === videoId);
+
   return new Promise((resolve) => {
-    const existing = findInterceptedTrack(query, videoId);
-    if (existing) {
-      resolve(existing);
+    if (hasPayload()) {
+      resolve(true);
       return;
     }
 
@@ -342,16 +351,15 @@ function waitForInterception(
       // The module-level listener records first, but re-record defensively so a
       // listener-ordering change can't strand this wait until timeout.
       recordInterceptedTrack(e.data.url ?? '', e.data.text);
-      const match = findInterceptedTrack(query, videoId);
-      if (!match) return;
+      if (!hasPayload()) return;
       window.removeEventListener('message', handler);
       clearTimeout(timer);
-      resolve(match);
+      resolve(true);
     };
     window.addEventListener('message', handler);
     const timer = setTimeout(() => {
       window.removeEventListener('message', handler);
-      resolve(null);
+      resolve(false);
     }, timeout);
   });
 }
