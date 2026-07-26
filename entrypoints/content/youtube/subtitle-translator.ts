@@ -34,6 +34,10 @@ export async function startRollingTranslation(
   } catch {
     /* use default */
   }
+  // Re-check: an abort during the storage await would otherwise attach the video
+  // listeners below and then register their cleanup on an already-fired signal,
+  // leaving them on an element YouTube reuses across navigations.
+  if (signal.aborted) return;
 
   return new Promise((resolve) => {
     const inFlight = new Set<string>();

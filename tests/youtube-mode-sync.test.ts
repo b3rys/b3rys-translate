@@ -11,10 +11,13 @@ vi.mock('@/entrypoints/content/youtube/subtitle-fetcher', () => ({
     kind: 'asr',
     baseUrl: 'https://example.com/sub',
   }),
-  downloadSubtitles: vi.fn().mockResolvedValue([
-    { start: 0, duration: 2, text: 'Hello world' },
-    { start: 2, duration: 2, text: 'How are you' },
-  ]),
+  downloadSubtitles: vi.fn().mockResolvedValue({
+    cues: [
+      { start: 0, duration: 2, text: 'Hello world' },
+      { start: 2, duration: 2, text: 'How are you' },
+    ],
+    isAsr: true,
+  }),
   baseLanguage: (code: string) => (code || '').split('-')[0].toLowerCase(),
   pruneInterceptedTracks: vi.fn(),
 }));

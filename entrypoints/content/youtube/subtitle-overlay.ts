@@ -114,6 +114,8 @@ export function stopOverlay(): void {
     videoEl.removeEventListener('seeked', onSeeked);
   }
   overlayEl?.remove();
+  // A notice still inside its 3.5s timer would otherwise float over the next video.
+  document.getElementById('movie_player')?.querySelector('.b3rys-yt-notice')?.remove();
   removeFontSizeStyle();
   overlayEl = null;
   originalEl = null;

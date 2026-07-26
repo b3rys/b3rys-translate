@@ -1,7 +1,9 @@
 /**
  * In-memory cache: videoId -> Map<originalText, translatedText>
  * Persists across subtitle on/off toggles within the same video.
- * Cleared on video navigation.
+ * Keyed per video, so entries never cross videos; cleared on target-language
+ * change and on page reload (navigation within the SPA keeps them, which makes
+ * going back to an earlier video instant).
  */
 const cache = new Map<string, Map<string, string>>();
 

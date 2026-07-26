@@ -18,7 +18,18 @@ description: YouTube 자막 번역 룰 (파이프라인, cue 병합, rolling 번
      매칭하면 **이전 영상의 cue가 다음 영상에 로드**된다 (새 타임라인 위의 옛 자막 = "자막
      꼬임", 새로고침해야 사라짐). 추가 규칙: `tlang=` 있는 응답은 YouTube 자동번역이므로 제외 ·
      bridge는 `status 200`만 인터셉트 (503 body 캐싱 금지) · 파싱 실패 payload는 버리고 다음
-     전략 진행 · 전환/클릭 시 `pruneInterceptedTracks(videoId)`
+     전략 진행 · 전환/클릭 시 `pruneInterceptedTracks(videoId)` · `v=` 없는 URL은 **현재 영상으로
+     태깅하지 않는다** (오태깅=오자막, 미태깅=단순 미스)
+   - ⚠️ **player response도 3개 전략 전부 `videoId`를 검증** (`isPlayerResponseFor()`)
+     — bridge(`ytInitialPlayerResponse`) · script 태그 파싱 · page HTML fetch. SPA 전환 후에도
+     MAIN world 값과 **초기 페이지의 inline script가 DOM에 남아 이전 영상을 가리킨다** (실측:
+     `videoId=ZvDkJsKE80k, expected=0mDjeG8K-cg`). 검증 없이 쓰면 이전 영상의
+     `captionTracks[].baseUrl`로 직접 fetch → 또 이전 자막. `videoDetails` 없는 응답도 거부.
+   - ⚠️ **자막 종류(kind)는 "요청한 트랙"이 아니라 "실제 받은 payload"로 판단**
+     — 매칭은 `lang` **정확 일치 → base 폴백** 순서 (`en`↔`en-CA`는 허용, `zh-Hant`↔`zh-Hans`는 금지),
+     `kind`는 같은 쪽을 우선하되 다른 쪽만 있으면 쓰고 **`downloadSubtitles`가 `isAsr`로 알려준다**.
+     ASR을 manual로 오판하면 병합·문장부호 보정을 건너뛰어 **단어 2~3개 조각 자막**이 그대로 나온다
+     (사용자 CC 기본값이 자동 생성일 때 발생).
 4. Cue 분리/병합 — YouTube 원본 cue(단어 2~3개 단위)를 번역 적정 크기로 재구성
 5. 이중 자막 오버레이 시작 — YouTube 기본 CC를 CSS로 숨기고, 커스텀 오버레이로 원문+번역 동시 표시
 6. Rolling translation 시작 — 전체 한꺼번에 번역하지 않고, 재생 위치 기준으로 선제적 번역

@@ -110,6 +110,9 @@ export default defineContentScript({
 
     // --- 4) Trigger captions: enable YouTube CC so it fetches timedtext ---
     let didToggleCC = false;
+    // Pending CC toggle. Cancelled on restore so a toggle scheduled for the video
+    // the user just left can't fire on the next one.
+    let ccToggleTimer: ReturnType<typeof setTimeout> | null = null;
 
     window.addEventListener('message', (e: MessageEvent) => {
       if (e.data?.type !== '__b3rys_trigger_captions') return;
@@ -140,7 +143,9 @@ export default defineContentScript({
         }
 
         // Toggle subtitles on after a short delay (module needs time to load)
-        setTimeout(() => {
+        if (ccToggleTimer) clearTimeout(ccToggleTimer);
+        ccToggleTimer = setTimeout(() => {
+          ccToggleTimer = null;
           const p2 = document.getElementById('movie_player') as unknown as Record<
             string,
             (...args: unknown[]) => void
@@ -159,6 +164,12 @@ export default defineContentScript({
     // --- 5) Restore captions: turn CC back off if we toggled it on ---
     window.addEventListener('message', (e: MessageEvent) => {
       if (e.data?.type !== '__b3rys_restore_captions') return;
+
+      if (ccToggleTimer) {
+        clearTimeout(ccToggleTimer);
+        ccToggleTimer = null;
+        console.log('[b3rys-bridge] Cancelled pending CC toggle');
+      }
 
       if (!didToggleCC) {
         console.log('[b3rys-bridge] CC was not toggled by us, skipping restore');
