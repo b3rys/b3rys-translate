@@ -7,6 +7,7 @@ import {
   clearInterceptedTracks,
   dropInterceptedTrack,
   isPlayerResponseFor,
+  retargetTimedtextUrl,
 } from '@/entrypoints/content/youtube/subtitle-fetcher';
 
 const VIDEO_A = 'ZvDkJsKE80k';
@@ -119,6 +120,47 @@ describe('intercepted timedtext cache', () => {
 
     expect(bestText('en', VIDEO_B, 'asr')).toBe('CUES_B');
     expect(bestText('en', VIDEO_A, 'asr')).toBeNull();
+  });
+});
+
+/**
+ * YouTube gates timedtext on a per-video proof-of-origin token (`pot`) that the
+ * player appends at request time. `captionTracks[].baseUrl` has no token and
+ * answers 200 with an EMPTY body, so when YouTube loaded a different caption
+ * language than we need (its own preference — e.g. a video with an official
+ * Korean track), the only way to get our track is to borrow the token from the
+ * request YouTube already made. Verified live: swapping lang=ko→en on such a URL
+ * returned the English track (52,460 → 103,696 bytes).
+ */
+describe('re-targeting a tokenized timedtext URL', () => {
+  // Shape taken verbatim from a live request (signed params shortened).
+  const LIVE =
+    'https://www.youtube.com/api/timedtext?v=RQWpF2Gb-gU&ei=9ixmas7H&caps=asr&hl=ko' +
+    '&sparams=ip%2Cipbits%2Cexpire%2Cv%2Cei%2Ccaps&signature=4604EDA9.753F36A7&key=yt8' +
+    '&lang=ko&potc=1&pot=MlPNWsN0x1p%3D%3D&fmt=json3&c=WEB';
+
+  it('swaps the language while preserving the signed params byte-for-byte', () => {
+    const out = retargetTimedtextUrl(LIVE, { lang: 'en' });
+
+    expect(out).toContain('&lang=en&');
+    expect(out).not.toContain('lang=ko');
+    // The token and signature must survive untouched — re-encoding invalidates them.
+    expect(out).toContain('&sparams=ip%2Cipbits%2Cexpire%2Cv%2Cei%2Ccaps');
+    expect(out).toContain('&signature=4604EDA9.753F36A7');
+    expect(out).toContain('&pot=MlPNWsN0x1p%3D%3D');
+    expect(out).toContain('?v=RQWpF2Gb-gU'); // leading param survives untouched
+  });
+
+  it('asks for json3 and drops YouTube’s auto-translation param', () => {
+    const out = retargetTimedtextUrl(`${LIVE}&tlang=ko`, { lang: 'en' });
+
+    expect(out).not.toContain('tlang');
+    expect(out).toContain('&fmt=json3');
+  });
+
+  it('sets or clears kind to match the requested track', () => {
+    expect(retargetTimedtextUrl(LIVE, { lang: 'en', kind: 'asr' })).toContain('&kind=asr');
+    expect(retargetTimedtextUrl(`${LIVE}&kind=asr`, { lang: 'en' })).not.toContain('kind=asr');
   });
 });
 

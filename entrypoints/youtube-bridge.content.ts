@@ -14,10 +14,29 @@ export default defineContentScript({
   main() {
     console.log('[b3rys-bridge] MAIN world bridge loaded');
 
+    /**
+     * The live player's response, which follows SPA navigation.
+     * `ytInitialPlayerResponse` keeps describing the video the page was LOADED
+     * with (verified: it still returned the previous video after switching), so
+     * it is only a fallback.
+     */
+    function readPlayerResponse(): unknown {
+      const player = document.getElementById('movie_player') as unknown as {
+        getPlayerResponse?: () => unknown;
+      } | null;
+      try {
+        const live = player?.getPlayerResponse?.();
+        if (live) return live;
+      } catch {
+        /* player not ready — fall back */
+      }
+      return (window as unknown as Record<string, unknown>).ytInitialPlayerResponse ?? null;
+    }
+
     // --- 1) Player response request handler ---
     window.addEventListener('message', (e: MessageEvent) => {
       if (e.data?.type === '__b3rys_get_player_response') {
-        const data = (window as unknown as Record<string, unknown>).ytInitialPlayerResponse ?? null;
+        const data = readPlayerResponse();
         console.log('[b3rys-bridge] Player response:', data ? 'found' : 'null');
         window.postMessage({
           type: '__b3rys_player_response',
