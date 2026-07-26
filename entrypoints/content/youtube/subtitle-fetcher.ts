@@ -87,8 +87,9 @@ export type SubtitleDownload = { cues: SubtitleCue[]; isAsr: boolean };
 /**
  * Download subtitle cues.
  * Strategy 1: Check intercepted timedtext data (from YouTube's own requests)
- * Strategy 2: Wait for YouTube to load subtitles (5s)
- * Strategy 3: Direct fetch via bridge
+ * Strategy 2: Re-target an intercepted URL to the track we want (borrows its token)
+ * Strategy 3: Wait for YouTube to load subtitles (5s)
+ * Strategy 4: Direct fetch of the track's own baseUrl
  */
 export async function downloadSubtitles(
   track: CaptionTrack,
@@ -96,29 +97,51 @@ export async function downloadSubtitles(
 ): Promise<SubtitleDownload> {
   console.log('[b3rys] Track:', track.languageCode, track.kind ?? 'manual');
   const query: TrackQuery = { lang: track.languageCode, kind: track.kind };
+  const triedUrls = new Set<string>();
 
-  // Strategy 1: Already intercepted?
-  const hit = findInterceptedTrack(query, videoId);
-  if (hit) {
-    console.log(`[b3rys] Using intercepted data: length=${hit.text.length}`);
-    // An unparseable payload must not dead-end the pipeline — drop it and let the
-    // remaining strategies run instead of throwing out of downloadSubtitles.
-    const cues = tryParse(hit.text);
-    if (cues) return asDownload(cues, hit);
-    dropInterceptedTrack(hit.text);
-  }
+  // Strategies 1+2 over whatever has been intercepted so far.
+  const fromInterceptions = async (): Promise<SubtitleDownload | null> => {
+    // 1: an interception of the track itself.
+    const hit = findInterceptedTrack(query, videoId);
+    if (hit) {
+      console.log(`[b3rys] Using intercepted data: length=${hit.text.length}`);
+      // An unparseable payload must not dead-end the pipeline — drop it and let the
+      // remaining strategies run instead of throwing out of downloadSubtitles.
+      const cues = tryParse(hit.text);
+      if (cues) return asDownload(cues, hit);
+      dropInterceptedTrack(hit.text);
+    }
 
-  // Strategy 2: Wait for YouTube's own subtitle loading
+    // 2: YouTube loaded some *other* track for this video — borrow its token and
+    // ask for the one we want.
+    const tokenized = tokenizedUrlFor(query, videoId);
+    if (!tokenized || triedUrls.has(tokenized)) return null;
+    triedUrls.add(tokenized);
+    console.log('[b3rys] Re-targeting an intercepted URL to', `${query.lang}/${queryKind(query)}`);
+    try {
+      const result = await bridgeFetch(tokenized);
+      console.log(`[b3rys] Re-targeted fetch: length=${result.length}`);
+      const cues = result ? tryParse(result) : null;
+      if (cues) return { cues, isAsr: isAsrKind(query.kind) };
+    } catch (err) {
+      console.warn('[b3rys] Re-targeted fetch failed:', err);
+    }
+    return null;
+  };
+
+  const cached = await fromInterceptions();
+  if (cached) return cached;
+
+  // Strategy 3: nothing intercepted yet — captions load ~1s after we ask YouTube to
+  // turn them on. Wait for ANY payload for this video (not just our language: a
+  // different one still carries the token), then retry the strategies above.
   console.log('[b3rys] Waiting for YouTube timedtext interception...');
-  const waited = await waitForInterception(query, videoId, 5000);
-  if (waited) {
-    console.log(`[b3rys] Got intercepted data: length=${waited.text.length}`);
-    const cues = tryParse(waited.text);
-    if (cues) return asDownload(cues, waited);
-    dropInterceptedTrack(waited.text);
+  if (await waitForAnyInterception(videoId, 5000)) {
+    const afterWait = await fromInterceptions();
+    if (afterWait) return afterWait;
   }
 
-  // Strategy 3: Direct fetch via bridge — this is the picked track itself,
+  // Strategy 4: Direct fetch via bridge — this is the picked track itself,
   // so its kind is authoritative.
   const sep = track.baseUrl.includes('?') ? '&' : '?';
   const urls = [track.baseUrl + sep + 'fmt=json3', track.baseUrl];
@@ -253,21 +276,73 @@ export function clearInterceptedTracks(): void {
   interceptedData.clear();
 }
 
+const queryKind = (query: TrackQuery) => (isAsrKind(query.kind) ? 'asr' : 'manual');
+
+/** Replace a query param in place, preserving every other character of the URL. */
+function setParam(url: string, key: string, value: string): string {
+  const pattern = new RegExp(`([?&]${key}=)[^&#]*`);
+  const encoded = encodeURIComponent(value);
+  return pattern.test(url) ? url.replace(pattern, `$1${encoded}`) : `${url}&${key}=${encoded}`;
+}
+
+/** Drop a query param that always follows another one (never the leading `?key=`). */
+function dropParam(url: string, key: string): string {
+  return url.replace(new RegExp(`&${key}=[^&#]*`), '');
+}
+
+/**
+ * Point an existing timedtext request at a different track, keeping its
+ * authorization params byte-for-byte.
+ *
+ * String surgery rather than URLSearchParams on purpose: the signed params
+ * (`sparams`, `signature`, `pot`) must not be re-encoded.
+ */
+export function retargetTimedtextUrl(url: string, query: TrackQuery): string {
+  let out = setParam(url, 'lang', query.lang);
+  out = dropParam(out, 'tlang'); // never YouTube's own auto-translation
+  out = isAsrKind(query.kind) ? setParam(out, 'kind', 'asr') : dropParam(out, 'kind');
+  return setParam(out, 'fmt', 'json3');
+}
+
+/**
+ * A timedtext URL for this video that carries YouTube's proof-of-origin token,
+ * re-pointed at the requested track.
+ *
+ * `captionTracks[].baseUrl` is no longer enough on its own: without the `pot`
+ * token the player appends at request time, YouTube answers 200 with an EMPTY
+ * body (verified live for URLs from both the live player response and page HTML).
+ * The token is per *video*, not per language — swapping `lang=ko` → `lang=en` on
+ * an intercepted URL returned the full English track (52,460 → 103,696 bytes).
+ * So when YouTube loaded a different language than we need (its own caption
+ * preference), borrow the token from that request instead of failing.
+ */
+function tokenizedUrlFor(query: TrackQuery, videoId: string | null): string | null {
+  if (!videoId) return null;
+  for (const [url, entry] of [...interceptedData].reverse()) {
+    if (entry.videoId !== videoId || !/[?&]pot=/.test(url)) continue;
+    return retargetTimedtextUrl(url, query);
+  }
+  return null;
+}
+
 window.addEventListener('message', (e: MessageEvent) => {
   if (e.data?.type !== '__b3rys_timedtext_intercepted') return;
   console.log(`[b3rys] Received intercepted timedtext: length=${e.data.text?.length}`);
   recordInterceptedTrack(e.data.url ?? '', e.data.text);
 });
 
-function waitForInterception(
-  query: TrackQuery,
-  videoId: string | null,
-  timeout: number,
-): Promise<InterceptedTrack | null> {
+/**
+ * Resolve once YouTube has loaded captions for this video — in ANY language.
+ * A different language is still useful: it carries the per-video token, so the
+ * caller can re-target it (see `tokenizedUrlFor`).
+ */
+function waitForAnyInterception(videoId: string | null, timeout: number): Promise<boolean> {
+  const hasPayload = () =>
+    [...interceptedData.values()].some((entry) => videoId && entry.videoId === videoId);
+
   return new Promise((resolve) => {
-    const existing = findInterceptedTrack(query, videoId);
-    if (existing) {
-      resolve(existing);
+    if (hasPayload()) {
+      resolve(true);
       return;
     }
 
@@ -276,16 +351,15 @@ function waitForInterception(
       // The module-level listener records first, but re-record defensively so a
       // listener-ordering change can't strand this wait until timeout.
       recordInterceptedTrack(e.data.url ?? '', e.data.text);
-      const match = findInterceptedTrack(query, videoId);
-      if (!match) return;
+      if (!hasPayload()) return;
       window.removeEventListener('message', handler);
       clearTimeout(timer);
-      resolve(match);
+      resolve(true);
     };
     window.addEventListener('message', handler);
     const timer = setTimeout(() => {
       window.removeEventListener('message', handler);
-      resolve(null);
+      resolve(false);
     }, timeout);
   });
 }

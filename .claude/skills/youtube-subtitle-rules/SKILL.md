@@ -9,10 +9,21 @@ description: YouTube 자막 번역 룰 (파이프라인, cue 병합, rolling 번
 
 1. 플레이어 버튼 클릭 → YouTube 내부 player 객체에서 자막 트랙 목록(captionTracks) 획득
 2. English 트랙 선택 — manual(사람 작성, 정확도 높음) 우선, 없으면 ASR(자동 생성) 폴백
-3. 자막 다운로드 (3-strategy)
+3. 자막 다운로드 (4-strategy)
    - 인터셉트: bridge 스크립트가 YouTube 네트워크 요청을 가로채서 자막 데이터 추출
-   - 대기: 인터셉트 실패 시, YouTube가 자체적으로 자막을 로드할 때까지 대기
-   - bridge fetch: 둘 다 실패하면, bridge가 직접 자막 URL로 fetch 요청
+   - **재타게팅**: 이 영상의 인터셉트 URL에서 `lang`/`kind`만 바꿔 재요청 (토큰 차용, 아래 ⚠️)
+   - 대기: 그래도 없으면, YouTube가 자체적으로 자막을 로드할 때까지 5초 대기
+   - bridge fetch: 마지막으로 트랙의 `baseUrl` 직접 요청 (토큰 없어 대개 실패)
+   - ⚠️ **`captionTracks[].baseUrl` 직접 요청은 더 이상 신뢰 불가** — YouTube가 timedtext에
+     **영상별 proof-of-origin 토큰(`pot`)** 을 요구한다. 토큰 없이 요청하면 **200 + 본문 0바이트**
+     (실패로 보이지 않는다!). live player response·page HTML 어느 출처의 baseUrl이든 동일.
+     토큰은 **언어별이 아니라 영상별**이므로, YouTube가 이미 보낸 요청 URL에서 `lang`/`kind`만
+     교체해 재사용한다 (`retargetTimedtextUrl()`, 실측: `lang=ko`→`en` 교체로 52,460→103,696바이트).
+     서명 파라미터(`sparams`·`signature`·`pot`)는 **재인코딩하면 무효**가 되므로 URLSearchParams를
+     쓰지 말고 문자열 치환할 것. 이 경로가 없으면 **공식 한국어 자막이 있는 영상**은 YouTube가 ko만
+     로드해서 en 인터셉트가 없어 **이중자막이 아예 안 나온다**.
+   - ⚠️ **player response는 live `getPlayerResponse()` 우선** — `ytInitialPlayerResponse`는
+     페이지가 **로드된** 영상을 계속 가리킨다 (SPA 전환 후에도). live 값은 전환을 따라간다.
    - ⚠️ **인터셉트 캐시는 반드시 `videoId + lang`으로 매칭** (`subtitle-fetcher.ts`)
      — YouTube는 SPA라 `interceptedData` Map이 영상 전환 후에도 살아남는다. `lang=`만으로
      매칭하면 **이전 영상의 cue가 다음 영상에 로드**된다 (새 타임라인 위의 옛 자막 = "자막

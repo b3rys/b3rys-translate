@@ -71,6 +71,7 @@
 - [x] v0.5.7 버전 bump (YouTube 자막 교차오염 수정 포함)
 - [x] **SPA 전환 후 stale player response 차단** — `ytInitialPlayerResponse`·초기 페이지 script 태그가 전환 후에도 이전 영상을 가리킴(실측 확인). 3개 전략 전부 videoId 검증 (4 tests)
 - [x] **자막 종류(kind)·locale 매칭 정밀화 + 잔여 누수 정리** — 실제 받은 payload로 ASR/manual 판정(조각 자막 방지) · `lang` 정확 일치 우선(zh-Hant↔zh-Hans 오매칭 차단) · `v=` 없는 URL 오태깅 금지 · 언어 변경 시 videoId 재검증(떠난 영상 재번역 방지) · rolling translation 리스너 누수 · notice 잔존 · CC 토글 타이머 미취소 · 스킬 문서에 #16 규칙 기록 (하네스 3인 검수 반영)
+- [x] **`pot` 토큰 게이팅으로 자막을 못 받던 버그** — YouTube가 timedtext에 영상별 proof-of-origin 토큰을 요구(baseUrl 직접 요청 시 200 + 0바이트). 공식 한국어 자막이 있는 영상은 YouTube가 ko만 로드해 en 인터셉트가 없어 이중자막이 아예 안 나옴. 인터셉트한 URL의 토큰을 빌려 `lang`/`kind`만 교체해 재요청(토큰은 영상별, 실측 검증) · bridge를 live `getPlayerResponse()` 우선으로 (HTML fetch 폴백 제거) (3 tests)
 
 > 범례: `[x]` 완료 · `[~]` 진행중 · `[ ]` 미착수
 
