@@ -68,6 +68,7 @@
 - [x] 둥둥이 '새로고침하세요' 말풍선 깜박임 제거 (#13)
 - [x] v0.5.6 버전 bump
 - [x] **YouTube 영상 전환 시 이전 자막 재사용 버그** — 인터셉트한 timedtext를 `lang=`만으로 매칭해 SPA 전환 후 이전 영상 cue가 로드됨. videoId+lang 키 격리 · 전환/클릭 시 prune · tlang(YT 자동번역) 제외 · 503 응답 캐싱 차단 · 파싱 실패 payload 자기치유 · 오버레이 videoId 안전망 (7 tests)
+- [x] v0.5.7 버전 bump (YouTube 자막 교차오염 수정 포함)
 
 > 범례: `[x]` 완료 · `[~]` 진행중 · `[ ]` 미착수
 
