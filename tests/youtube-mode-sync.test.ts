@@ -16,6 +16,7 @@ vi.mock('@/entrypoints/content/youtube/subtitle-fetcher', () => ({
     { start: 2, duration: 2, text: 'How are you' },
   ]),
   baseLanguage: (code: string) => (code || '').split('-')[0].toLowerCase(),
+  pruneInterceptedTracks: vi.fn(),
 }));
 
 vi.mock('@/entrypoints/content/youtube/subtitle-translator', () => ({

@@ -31,7 +31,9 @@ export default defineContentScript({
     window.fetch = async function (...args: Parameters<typeof fetch>) {
       const response = await origFetch.apply(this, args);
       const url = String(args[0] ?? '');
-      if (url.includes('/api/timedtext')) {
+      // Only successful responses: YouTube answers timedtext with 503 often enough
+      // that caching an error body would poison the subtitle pipeline.
+      if (url.includes('/api/timedtext') && response.ok) {
         try {
           const clone = response.clone();
           const text = await clone.text();
@@ -65,7 +67,7 @@ export default defineContentScript({
       const xhrUrl = (this as unknown as Record<string, string>).__b3rysUrl ?? '';
       if (xhrUrl.includes('/api/timedtext')) {
         this.addEventListener('load', () => {
-          if (this.responseText) {
+          if (this.status === 200 && this.responseText) {
             console.log(
               `[b3rys-bridge] Intercepted XHR timedtext: length=${this.responseText.length}`,
             );
