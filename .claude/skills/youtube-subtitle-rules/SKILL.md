@@ -13,6 +13,12 @@ description: YouTube 자막 번역 룰 (파이프라인, cue 병합, rolling 번
    - 인터셉트: bridge 스크립트가 YouTube 네트워크 요청을 가로채서 자막 데이터 추출
    - 대기: 인터셉트 실패 시, YouTube가 자체적으로 자막을 로드할 때까지 대기
    - bridge fetch: 둘 다 실패하면, bridge가 직접 자막 URL로 fetch 요청
+   - ⚠️ **인터셉트 캐시는 반드시 `videoId + lang`으로 매칭** (`subtitle-fetcher.ts`)
+     — YouTube는 SPA라 `interceptedData` Map이 영상 전환 후에도 살아남는다. `lang=`만으로
+     매칭하면 **이전 영상의 cue가 다음 영상에 로드**된다 (새 타임라인 위의 옛 자막 = "자막
+     꼬임", 새로고침해야 사라짐). 추가 규칙: `tlang=` 있는 응답은 YouTube 자동번역이므로 제외 ·
+     bridge는 `status 200`만 인터셉트 (503 body 캐싱 금지) · 파싱 실패 payload는 버리고 다음
+     전략 진행 · 전환/클릭 시 `pruneInterceptedTracks(videoId)`
 4. Cue 분리/병합 — YouTube 원본 cue(단어 2~3개 단위)를 번역 적정 크기로 재구성
 5. 이중 자막 오버레이 시작 — YouTube 기본 CC를 CSS로 숨기고, 커스텀 오버레이로 원문+번역 동시 표시
 6. Rolling translation 시작 — 전체 한꺼번에 번역하지 않고, 재생 위치 기준으로 선제적 번역
@@ -67,4 +73,6 @@ description: YouTube 자막 번역 룰 (파이프라인, cue 병합, rolling 번
 - Bridge의 fetch/XHR 몽키패칭은 YouTube 내부 변경에 취약
 - 약어 보호가 알려진 패턴(ABBREV_RE, DOTTED_ABBREV_RE)에만 적용 — 미등록 약어에서는 오분리 가능
 - 인메모리 자막 캐시는 페이지 새로고침 시 초기화 (background 영속 캐시는 유지)
+- 오버레이는 `currentVideoId !== 페이지 videoId`면 그리지 않는다 (`subtitle-overlay.ts` 안전망) —
+  `yt-navigate-finish`가 누락돼 teardown이 안 된 경우에도 이전 영상 자막이 보이지 않게 하는 최후 방어선
 - 번역 캐시 키는 원문 텍스트 → 다른 영상에서 같은 문장이 다른 컨텍스트에서 나오면 캐시된 번역이 반환됨 (대부분 자연스러움)

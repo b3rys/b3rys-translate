@@ -1,5 +1,6 @@
 import type { SubtitleCue } from '@/types';
 import { getTranslation } from './subtitle-cache';
+import { getVideoId } from '@/utils/youtube-helpers';
 
 export type SubtitleDisplayMode = 'both' | 'en' | 'ko';
 let displayMode: SubtitleDisplayMode = 'both';
@@ -149,9 +150,32 @@ function startDisplayLoop(): void {
   rafId = requestAnimationFrame(tick);
 }
 
+/**
+ * The page's current videoId, memoized on `location.search` so the display loop
+ * doesn't re-parse the URL 60×/s. Timestamp links (`&t=`) change the search
+ * string but not the id, so the comparison stays on the id itself.
+ */
+let lastSearch: string | null = null;
+let lastSeenVideoId: string | null = null;
+function pageVideoId(): string | null {
+  if (location.search !== lastSearch) {
+    lastSearch = location.search;
+    lastSeenVideoId = getVideoId();
+  }
+  return lastSeenVideoId;
+}
+
 function updateDisplay(): void {
   if (!videoEl || !overlayEl || !originalEl || !translatedEl || !currentVideoId) return;
   if (isSeeking) return;
+
+  // Safety net: if the page moved to another video without a teardown, never
+  // paint the previous video's cues onto the new timeline.
+  if (currentVideoId !== pageVideoId()) {
+    overlayEl.style.display = 'none';
+    lastDisplayedIdx = -1;
+    return;
+  }
 
   const idx = findCurrentCueIdx(videoEl.currentTime);
 

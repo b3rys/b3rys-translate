@@ -1,5 +1,6 @@
 import type { CaptionTrack, SubtitleCue } from '@/types';
 import { LANG_STORAGE_KEY, DEFAULT_SOURCE_LANG } from '@/utils/constants';
+import { getVideoId } from '@/utils/youtube-helpers';
 
 /**
  * Extract caption tracks from YouTube's player response.
@@ -86,22 +87,31 @@ function pickSourceTrack(tracks: CaptionTrack[], lang: string): CaptionTrack | n
  * Strategy 2: Wait for YouTube to load subtitles (5s)
  * Strategy 3: Direct fetch via bridge
  */
-export async function downloadSubtitles(track: CaptionTrack): Promise<SubtitleCue[]> {
+export async function downloadSubtitles(
+  track: CaptionTrack,
+  videoId: string | null = getVideoId(),
+): Promise<SubtitleCue[]> {
   console.log('[b3rys] Track:', track.languageCode, track.kind ?? 'manual');
 
   // Strategy 1: Already intercepted?
-  let text = checkInterceptedData(track.languageCode);
+  let text = checkInterceptedData(track.languageCode, videoId);
   if (text) {
     console.log(`[b3rys] Using intercepted data: length=${text.length}`);
-    return parseSubtitleResponse(text);
+    // An unparseable payload must not dead-end the pipeline — drop it and let the
+    // remaining strategies run instead of throwing out of downloadSubtitles.
+    const cues = tryParse(text);
+    if (cues) return cues;
+    dropInterceptedTrack(text);
   }
 
   // Strategy 2: Wait for YouTube's own subtitle loading
   console.log('[b3rys] Waiting for YouTube timedtext interception...');
-  text = await waitForInterception(track.languageCode, 5000);
+  text = await waitForInterception(track.languageCode, videoId, 5000);
   if (text) {
     console.log(`[b3rys] Got intercepted data: length=${text.length}`);
-    return parseSubtitleResponse(text);
+    const cues = tryParse(text);
+    if (cues) return cues;
+    dropInterceptedTrack(text);
   }
 
   // Strategy 3: Direct fetch via bridge
@@ -123,24 +133,81 @@ export async function downloadSubtitles(track: CaptionTrack): Promise<SubtitleCu
 
 // ===================== Timedtext interception =====================
 
-const interceptedData = new Map<string, string>();
+type InterceptedTrack = { videoId: string | null; lang: string | null; text: string };
 
-window.addEventListener('message', (e: MessageEvent) => {
-  if (e.data?.type !== '__b3rys_timedtext_intercepted') return;
-  console.log(`[b3rys] Received intercepted timedtext: length=${e.data.text?.length}`);
-  interceptedData.set(e.data.url, e.data.text);
-});
+/**
+ * Timedtext payloads intercepted from YouTube's own requests, keyed by request URL.
+ *
+ * YouTube is an SPA, so this map survives video navigation. Lookups therefore
+ * MUST match the videoId, not just the language: matching on `lang=` alone made
+ * the *previous* video's cues load on the next video (old text on a fresh
+ * timeline — reads as scrambled/leftover subtitles, and only a reload cleared it).
+ */
+const interceptedData = new Map<string, InterceptedTrack>();
 
-function checkInterceptedData(lang: string): string | null {
-  for (const [url, text] of interceptedData) {
-    if (url.includes(`lang=${lang}`)) return text;
+/** Read a query param out of a URL string (works for relative URLs too). */
+function urlParam(url: string, key: string): string | null {
+  const match = new RegExp(`[?&]${key}=([^&#]*)`).exec(url);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+export function recordInterceptedTrack(url: string, text: string): void {
+  interceptedData.set(url, {
+    // The timedtext URL carries the video id; fall back to the page's current
+    // video if YouTube ever omits it.
+    videoId: urlParam(url, 'v') ?? getVideoId(),
+    lang: urlParam(url, 'lang'),
+    text,
+  });
+}
+
+/** Forget a payload that turned out not to be parseable subtitle data. */
+export function dropInterceptedTrack(text: string): void {
+  for (const [url, entry] of interceptedData) {
+    if (entry.text === text) interceptedData.delete(url);
+  }
+}
+
+/** Drop payloads belonging to other videos (SPA navigation cleanup). */
+export function pruneInterceptedTracks(keepVideoId: string | null): void {
+  for (const [url, entry] of interceptedData) {
+    if (entry.videoId !== keepVideoId) interceptedData.delete(url);
+  }
+}
+
+function matchesTrack(
+  url: string,
+  entry: InterceptedTrack,
+  lang: string,
+  videoId: string | null,
+): boolean {
+  if (entry.videoId !== videoId) return false;
+  // Responses carrying tlang= are YouTube's own auto-translation, not source captions.
+  if (urlParam(url, 'tlang')) return false;
+  return baseLanguage(entry.lang ?? '') === baseLanguage(lang);
+}
+
+export function checkInterceptedData(lang: string, videoId: string | null): string | null {
+  // Newest first — a re-request for the same track supersedes earlier payloads.
+  for (const [url, entry] of [...interceptedData].reverse()) {
+    if (matchesTrack(url, entry, lang, videoId)) return entry.text;
   }
   return null;
 }
 
-function waitForInterception(lang: string, timeout: number): Promise<string | null> {
+window.addEventListener('message', (e: MessageEvent) => {
+  if (e.data?.type !== '__b3rys_timedtext_intercepted') return;
+  console.log(`[b3rys] Received intercepted timedtext: length=${e.data.text?.length}`);
+  recordInterceptedTrack(e.data.url ?? '', e.data.text);
+});
+
+function waitForInterception(
+  lang: string,
+  videoId: string | null,
+  timeout: number,
+): Promise<string | null> {
   return new Promise((resolve) => {
-    const existing = checkInterceptedData(lang);
+    const existing = checkInterceptedData(lang, videoId);
     if (existing) {
       resolve(existing);
       return;
@@ -148,11 +215,14 @@ function waitForInterception(lang: string, timeout: number): Promise<string | nu
 
     const handler = (e: MessageEvent) => {
       if (e.data?.type !== '__b3rys_timedtext_intercepted') return;
-      if ((e.data.url ?? '').includes(`lang=${lang}`)) {
-        window.removeEventListener('message', handler);
-        clearTimeout(timer);
-        resolve(e.data.text);
-      }
+      // The module-level listener records first, but re-record defensively so a
+      // listener-ordering change can't strand this wait until timeout.
+      recordInterceptedTrack(e.data.url ?? '', e.data.text);
+      const match = checkInterceptedData(lang, videoId);
+      if (!match) return;
+      window.removeEventListener('message', handler);
+      clearTimeout(timer);
+      resolve(match);
     };
     window.addEventListener('message', handler);
     const timer = setTimeout(() => {
@@ -291,6 +361,16 @@ function extractPlayerResponseJSON(text: string): Record<string, unknown> | null
 }
 
 // ===================== Subtitle parsing =====================
+
+/** parseSubtitleResponse, but returns null instead of throwing on bad input. */
+function tryParse(text: string): SubtitleCue[] | null {
+  try {
+    return parseSubtitleResponse(text);
+  } catch (err) {
+    console.warn('[b3rys] Intercepted payload was not subtitle data — discarding:', err);
+    return null;
+  }
+}
 
 export function parseSubtitleResponse(text: string): SubtitleCue[] {
   // Try JSON (fmt=json3)

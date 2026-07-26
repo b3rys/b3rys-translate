@@ -5,6 +5,7 @@ import {
   pickSourceLanguageTrack,
   downloadSubtitles,
   baseLanguage,
+  pruneInterceptedTracks,
 } from './subtitle-fetcher';
 import { startRollingTranslation } from './subtitle-translator';
 import {
@@ -48,6 +49,9 @@ export function initYouTubeSubtitles(): void {
   buttonReady = injectButton();
   document.addEventListener('yt-navigate-finish', () => {
     if (isActive) cancelPipeline();
+    // Intercepted timedtext survives SPA navigation — drop other videos' payloads
+    // so a stale one can never be picked up (and so the map can't grow unbounded).
+    pruneInterceptedTracks(getVideoId());
     if (!document.querySelector('.b3rys-yt-btn')) buttonReady = injectButton();
   });
 
@@ -251,6 +255,9 @@ async function handleButtonClick(): Promise<void> {
   const videoId = getVideoId();
   if (!videoId) return;
 
+  // Guard against a missed yt-navigate-finish: never start from another video's payload.
+  pruneInterceptedTracks(videoId);
+
   isActive = true;
   currentMode = 'both';
   abortController = new AbortController();
@@ -276,7 +283,7 @@ async function handleButtonClick(): Promise<void> {
     const targetLang = await getTargetLanguage();
     const sourceOnly = baseLanguage(track.languageCode) === baseLanguage(targetLang);
 
-    const cues = await downloadSubtitles(track);
+    const cues = await downloadSubtitles(track, videoId);
     if (signal.aborted) return;
 
     if (cues.length === 0) {
