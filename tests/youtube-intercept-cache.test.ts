@@ -5,6 +5,7 @@ import {
   checkInterceptedData,
   pruneInterceptedTracks,
   dropInterceptedTrack,
+  isPlayerResponseFor,
 } from '@/entrypoints/content/youtube/subtitle-fetcher';
 
 const VIDEO_A = 'ZvDkJsKE80k';
@@ -75,5 +76,32 @@ describe('intercepted timedtext cache', () => {
 
     expect(checkInterceptedData('en', VIDEO_B)).toBe('CUES_B');
     expect(checkInterceptedData('en', VIDEO_A)).toBeNull();
+  });
+});
+
+/**
+ * Regression: after an SPA navigation both `ytInitialPlayerResponse` and the
+ * initial page's inline scripts still describe the *previous* video (observed
+ * live: bridge returned ZvDkJsKE80k while the page was on 0mDjeG8K-cg). Using
+ * that response would hand the previous video's caption URLs to the new video.
+ */
+describe('player response staleness guard', () => {
+  const responseFor = (videoId: string) => ({ videoDetails: { videoId }, captions: {} });
+
+  it('accepts a response for the current video', () => {
+    expect(isPlayerResponseFor(responseFor(VIDEO_B), VIDEO_B)).toBe(true);
+  });
+
+  it('rejects a response left over from another video', () => {
+    expect(isPlayerResponseFor(responseFor(VIDEO_A), VIDEO_B)).toBe(false);
+  });
+
+  it('rejects a response with no videoDetails to verify', () => {
+    expect(isPlayerResponseFor({ captions: {} }, VIDEO_A)).toBe(false);
+  });
+
+  it('rejects when there is no current video', () => {
+    expect(isPlayerResponseFor(responseFor(VIDEO_A), null)).toBe(false);
+    expect(isPlayerResponseFor(null, VIDEO_A)).toBe(false);
   });
 });

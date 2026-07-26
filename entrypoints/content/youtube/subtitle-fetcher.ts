@@ -259,20 +259,30 @@ function bridgeFetch(url: string): Promise<string> {
  * Falls back to script tag parsing.
  */
 async function getPlayerResponse(): Promise<Record<string, unknown> | null> {
+  const videoId = getVideoId();
+
   // Strategy 1: Ask MAIN world bridge for ytInitialPlayerResponse
   const fromBridge = await getPlayerResponseFromBridge();
   if (fromBridge) {
-    const videoId = new URLSearchParams(location.search).get('v');
-    const responseVideoId = (fromBridge.videoDetails as Record<string, string>)?.videoId;
-    console.log(`[b3rys] Bridge player response: videoId=${responseVideoId}, expected=${videoId}`);
-    if (responseVideoId === videoId) return fromBridge;
+    console.log(
+      `[b3rys] Bridge player response: videoId=${playerResponseVideoId(fromBridge)}, expected=${videoId}`,
+    );
+    if (isPlayerResponseFor(fromBridge, videoId)) return fromBridge;
   }
 
-  // Strategy 2: Parse from script tags
+  // Strategy 2: Parse from script tags. After an SPA navigation the *initial*
+  // page's inline script is still in the DOM, so this can hand back the
+  // previously watched video — the videoId check is what keeps its caption URLs
+  // from being used on the current one.
   const fromDOM = extractFromScripts();
-  if (fromDOM) {
+  if (isPlayerResponseFor(fromDOM, videoId)) {
     console.log('[b3rys] Using player response from script tags');
     return fromDOM;
+  }
+  if (fromDOM) {
+    console.log(
+      `[b3rys] Script-tag player response is for ${playerResponseVideoId(fromDOM)} — ignoring`,
+    );
   }
 
   // Strategy 3: Fetch page HTML
@@ -280,10 +290,27 @@ async function getPlayerResponse(): Promise<Record<string, unknown> | null> {
     console.log('[b3rys] Fetching page HTML for player response...');
     const response = await fetch(location.href);
     const html = await response.text();
-    return extractPlayerResponseJSON(html);
+    const fromHTML = extractPlayerResponseJSON(html);
+    return isPlayerResponseFor(fromHTML, videoId) ? fromHTML : null;
   } catch {
     return null;
   }
+}
+
+function playerResponseVideoId(response: Record<string, unknown> | null): string | undefined {
+  return (response?.videoDetails as Record<string, string> | undefined)?.videoId;
+}
+
+/**
+ * Whether a player response describes the given video. Every source of player
+ * data can be stale on YouTube's SPA, so each one is checked before use.
+ */
+export function isPlayerResponseFor(
+  response: Record<string, unknown> | null,
+  videoId: string | null,
+): boolean {
+  if (!response || !videoId) return false;
+  return playerResponseVideoId(response) === videoId;
 }
 
 function getPlayerResponseFromBridge(): Promise<Record<string, unknown> | null> {

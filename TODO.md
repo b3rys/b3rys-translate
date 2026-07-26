@@ -69,6 +69,7 @@
 - [x] v0.5.6 버전 bump
 - [x] **YouTube 영상 전환 시 이전 자막 재사용 버그** — 인터셉트한 timedtext를 `lang=`만으로 매칭해 SPA 전환 후 이전 영상 cue가 로드됨. videoId+lang 키 격리 · 전환/클릭 시 prune · tlang(YT 자동번역) 제외 · 503 응답 캐싱 차단 · 파싱 실패 payload 자기치유 · 오버레이 videoId 안전망 (7 tests)
 - [x] v0.5.7 버전 bump (YouTube 자막 교차오염 수정 포함)
+- [x] **SPA 전환 후 stale player response 차단** — `ytInitialPlayerResponse`·초기 페이지 script 태그가 전환 후에도 이전 영상을 가리킴(실측 확인). 3개 전략 전부 videoId 검증 (4 tests)
 
 > 범례: `[x]` 완료 · `[~]` 진행중 · `[ ]` 미착수
 
