@@ -19,6 +19,15 @@ export interface SiteRule {
   /** Replace element content entirely with translation (used with translateSelectors) */
   forceReplace?: boolean;
   /**
+   * Split a matched element into per-paragraph units before translating, using
+   * blank lines as the boundary. Some sites (antirez) put an entire article in
+   * ONE `<pre>`; without this the whole thing is a single block and the reader
+   * gets a wall of Korean *after* a wall of English. Paragraph-by-paragraph is
+   * the product default, so any rule whose selector matches a multi-paragraph
+   * container should set this.
+   */
+  splitParagraphs?: boolean;
+  /**
    * After a translation pass, nudge the scroll container by 1px to force a
    * repaint. For virtualized / `content-visibility` lists (Substack chat) the
    * browser defers painting injected content until the next scroll — so the
@@ -64,6 +73,7 @@ const SITE_RULES: Record<string, SiteRule> = {
       '#newslist article[data-news-id="169"] h2',
       'topcomment article.comment > pre:not(:has(code))',
     ],
+    splitParagraphs: true,
   },
   'skilljar.com': {
     injectAsSibling: true,

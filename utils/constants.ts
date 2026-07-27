@@ -7,7 +7,7 @@ export const ENGINE_ENDPOINTS = {
 
 /** Logged at content-script startup so the running bundle can be identified
  * in DevTools (stale bundles after a rebuild look identical otherwise). */
-export const BUILD_TAG = '0.5.9';
+export const BUILD_TAG = '0.5.11';
 
 export const BATCH_SIZE = 15;
 export const VIEWPORT_BATCH_SIZE = 5;

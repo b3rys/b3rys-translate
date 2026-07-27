@@ -36,6 +36,19 @@ interface EngineUsageStats {
 type UsageStats = Partial<Record<string, EngineUsageStats>>;
 
 document.addEventListener('DOMContentLoaded', async () => {
+  // 매니페스트에서 읽는다. HTML 에 손으로 적으면 버전을 올릴 때마다 어긋나고,
+  // 그러면 "지금 어느 빌드가 도는지" 를 이 표시로 판별할 수 없다.
+  const versionLabel = document.getElementById('version-label');
+  if (versionLabel) {
+    // getManifest 가 없는 환경(테스트 mock 등)에서 팝업 전체가 죽지 않게 감싼다.
+    // 버전 표시 하나 때문에 설정 화면이 안 뜨면 그게 더 큰 문제다.
+    try {
+      versionLabel.textContent = `v${chrome.runtime.getManifest().version}`;
+    } catch {
+      versionLabel.textContent = '';
+    }
+  }
+
   const engineSelect = document.getElementById('engine-select') as HTMLSelectElement;
   const apiKeyInput = document.getElementById('api-key') as HTMLInputElement;
   const saveButton = document.getElementById('save-key') as HTMLButtonElement;

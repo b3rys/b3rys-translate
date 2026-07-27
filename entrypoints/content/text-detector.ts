@@ -29,7 +29,7 @@ export function detectTextBlocks(root: Element = document.body): TextBlock[] {
   // Phase 0: Custom selectors (site-specific, replaces standard detection)
   const rule = getSiteRule();
   if (rule?.translateSelectors?.length) {
-    return detectSelectorBlocks(root, rule.translateSelectors);
+    return detectSelectorBlocks(root, rule.translateSelectors, rule.splitParagraphs === true);
   }
 
   // onlyWithin: restrict detection to content areas (whitelist approach)
@@ -64,23 +64,128 @@ export function detectTextBlocks(root: Element = document.body): TextBlock[] {
  * Phase 0: Detect elements matching site-specific CSS selectors.
  * Used for complex web apps (e.g. Gmail) where standard detection picks wrong elements.
  */
-function detectSelectorBlocks(root: Element, selectors: string[]): TextBlock[] {
+function detectSelectorBlocks(
+  root: Element,
+  selectors: string[],
+  splitParagraphs = false,
+): TextBlock[] {
   const blocks: TextBlock[] = [];
+  const push = (htmlEl: HTMLElement): void => {
+    if (htmlEl.hasAttribute(DATA_ATTRS.TRANSLATED) || htmlEl.hasAttribute(DATA_ATTRS.BLOCK_ID))
+      return;
+    if (isElementHidden(htmlEl)) return;
+    const text = (htmlEl.textContent ?? '').trim();
+    if (!text || !isLikelyEnglish(text)) return;
+
+    const id = `b3rys-${++blockCounter}`;
+    htmlEl.setAttribute(DATA_ATTRS.BLOCK_ID, id);
+    blocks.push({ id, element: htmlEl, text, html: text });
+  };
+
   for (const selector of selectors) {
     for (const el of root.querySelectorAll(selector)) {
       const htmlEl = el as HTMLElement;
       if (htmlEl.hasAttribute(DATA_ATTRS.TRANSLATED) || htmlEl.hasAttribute(DATA_ATTRS.BLOCK_ID))
         continue;
-      if (isElementHidden(htmlEl)) continue;
-      const text = (htmlEl.textContent ?? '').trim();
-      if (!text || !isLikelyEnglish(text)) continue;
 
-      const id = `b3rys-${++blockCounter}`;
-      htmlEl.setAttribute(DATA_ATTRS.BLOCK_ID, id);
-      blocks.push({ id, element: htmlEl, text, html: text });
+      if (splitParagraphs) {
+        const paragraphs = paragraphUnits(htmlEl);
+        // Only take the paragraph path when the split actually produced units.
+        // A single-paragraph element falls through and is translated whole.
+        if (paragraphs.length) {
+          for (const para of paragraphs) push(para);
+          continue;
+        }
+      }
+
+      push(htmlEl);
     }
   }
   return blocks;
+}
+
+/** Marks a wrapper this module created around one paragraph. */
+const PARA_ATTR = 'data-b3rys-para';
+/** Marks an element already split, so a re-detect reuses the wrappers. */
+const PARA_SPLIT_ATTR = 'data-b3rys-split';
+/** A blank line — one newline, optional horizontal space, another newline. */
+const PARA_BREAK = /\n[ \t]*\n/;
+
+/**
+ * Split an element into one wrapper per paragraph and return the wrappers.
+ *
+ * antirez.com puts an entire article inside a single `<pre>`, so translating the
+ * match as one block appends the whole Korean text below the whole English text.
+ * Wrapping each paragraph makes the translation land under the paragraph it
+ * belongs to, which is how the rest of the product reads.
+ *
+ * The wrappers are inline `<span>`s and the blank lines between them are kept as
+ * their own text nodes, so the visible layout of a `<pre>` is unchanged. The
+ * injector's existing `white-space: pre` branch then puts each translation on
+ * its own line.
+ *
+ * Returns `[]` and leaves the DOM untouched when there is nothing to gain
+ * (fewer than two paragraphs) — the caller then treats the element as one block.
+ */
+function paragraphUnits(el: HTMLElement): HTMLElement[] {
+  if (el.hasAttribute(PARA_SPLIT_ATTR)) {
+    return [...el.querySelectorAll<HTMLElement>(`[${PARA_ATTR}]`)];
+  }
+  // Decide BEFORE mutating: the split moves nodes, so it can't be undone cheaply.
+  const paragraphCount = (el.textContent ?? '').split(PARA_BREAK).filter((s) => s.trim()).length;
+  if (paragraphCount < 2) return [];
+
+  const rebuilt: Node[] = [];
+  const wrappers: HTMLElement[] = [];
+  let current: Node[] = [];
+
+  const flush = (): void => {
+    if (!current.length) return;
+    if (current.some((n) => (n.textContent ?? '').trim())) {
+      const wrapper = document.createElement('span');
+      wrapper.setAttribute(PARA_ATTR, 'true');
+      for (const node of current) wrapper.appendChild(node);
+      rebuilt.push(wrapper);
+      wrappers.push(wrapper);
+    } else {
+      // Whitespace-only run — keep it as-is rather than wrapping empty text.
+      rebuilt.push(...current);
+    }
+    current = [];
+  };
+
+  for (const node of [...el.childNodes]) {
+    // Blank lines inside a nested element (e.g. <b>) are not boundaries; only a
+    // top-level text node splits, which keeps inline markup intact.
+    if (node.nodeType !== Node.TEXT_NODE || !PARA_BREAK.test(node.textContent ?? '')) {
+      current.push(node);
+      continue;
+    }
+    // Capturing split: separators come back as their own entries.
+    for (const part of (node.textContent ?? '').split(/(\n[ \t]*\n[ \t\n]*)/)) {
+      if (!part) continue;
+      if (PARA_BREAK.test(part) && !part.trim()) {
+        flush();
+        rebuilt.push(document.createTextNode(part));
+      } else {
+        current.push(document.createTextNode(part));
+      }
+    }
+  }
+  flush();
+
+  if (wrappers.length < 2) {
+    // The blank lines sat somewhere that didn't yield separate units after all.
+    // Put the original children back so the caller sees an untouched element.
+    el.replaceChildren(
+      ...rebuilt.flatMap((n) => (wrappers.includes(n as HTMLElement) ? [...n.childNodes] : [n])),
+    );
+    return [];
+  }
+
+  el.setAttribute(PARA_SPLIT_ATTR, 'true');
+  el.replaceChildren(...rebuilt);
+  return wrappers;
 }
 
 // ============================================================

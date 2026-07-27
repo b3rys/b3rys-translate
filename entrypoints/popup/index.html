@@ -27,7 +27,11 @@
         </div>
         <div class="title-group">
           <h1 class="title">b3rys <span class="title-accent">translate</span></h1>
-          <span class="version">v0.5.7</span>
+          <!-- 값은 main.ts 가 매니페스트에서 읽어 채운다. 숫자를 여기 박지 말 것 —
+               손으로 적으면 버전을 올릴 때마다 어긋나고, 그러면 "지금 어느 빌드가
+               도는지" 를 이 표시로 판별할 수 없다. 실제로 새 빌드를 올려놓고 옛
+               빌드로 착각해 헤맨 적이 있다. -->
+          <span class="version" id="version-label"></span>
         </div>
       </header>
 
