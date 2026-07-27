@@ -66,11 +66,18 @@ const SITE_RULES: Record<string, SiteRule> = {
     mainContentSelector: '[role="main"]',
   },
   'antirez.com': {
-    // antirez renders article prose inside a single <pre>. Keep PRE globally
-    // skipped for code safety and opt in only the verified /news/169 structure.
-    pathPattern: /^\/news\/169\/?$/,
+    // antirez renders article prose inside a single <pre>. PRE stays globally
+    // skipped for code safety; this opts in the one structure the site uses for
+    // articles — /news/<n> (one article) and /latest/<n> (the index, which
+    // carries excerpts in the same markup).
+    //
+    // The `:not(:has(code))` guard below is kept for consistency with the other
+    // rules but does nothing here: this site never emits a <code> tag. Code
+    // safety comes from splitParagraphs, which skips indented code paragraphs
+    // individually instead of giving up on the whole article.
+    pathPattern: /^\/(news|latest)\/\d+\/?$/,
     translateSelectors: [
-      '#newslist article[data-news-id="169"] h2',
+      '#newslist article[data-news-id] h2',
       'topcomment article.comment > pre:not(:has(code))',
     ],
     splitParagraphs: true,

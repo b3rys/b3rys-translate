@@ -109,6 +109,33 @@ describe('antirez preformatted prose rule', () => {
     expect(document.querySelectorAll('[data-b3rys-para]').length).toBe(first);
   });
 
+  it('does not translate an indented code paragraph inside the prose PRE', () => {
+    // antirez 는 코드를 같은 <pre> 안에 들여쓰기로만 넣고 <code> 태그를 쓰지
+    // 않는다. 그래서 선택자의 :has(code) 가드는 이 사이트에서 아무 일도 하지
+    // 않고, 문단 단위로 코드를 걸러내지 않으면 코드가 산문처럼 번역돼 나간다.
+    stubLocation('antirez.com', '/news/166');
+    _resetSkipSelectorsCache();
+    document.body.innerHTML = fixture;
+    const pre = document.querySelector('topcomment article.comment > pre') as HTMLElement;
+    pre.appendChild(
+      document.createTextNode(
+        '\n\n  int count = 10;\n  if (count > limit) {\n    count = limit;\n  }\n\n',
+      ),
+    );
+    pre.appendChild(document.createTextNode('And that is the whole trick behind it.\n'));
+
+    const texts = detectTextBlocks(document.body).map((block) => block.text);
+
+    expect(texts.some((text) => text.includes('int count'))).toBe(false);
+    // 코드 바로 뒤 산문은 정상적으로 잡혀야 한다 — 코드 이후를 통째로 버리면 안 된다.
+    expect(texts.some((text) => text.includes('And that is the whole trick'))).toBe(true);
+  });
+
+  it('covers other articles and the latest index, not just news/169', () => {
+    expect(detectFixture('antirez.com', '/news/171').length).toBeGreaterThan(0);
+    expect(detectFixture('antirez.com', '/latest/0').length).toBeGreaterThan(0);
+  });
+
   it('preserves paragraph line breaks in the injected antirez translation', () => {
     stubLocation('antirez.com', '/news/169');
     _resetSkipSelectorsCache();

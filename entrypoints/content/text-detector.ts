@@ -111,6 +111,30 @@ const PARA_SPLIT_ATTR = 'data-b3rys-split';
 /** A blank line — one newline, optional horizontal space, another newline. */
 const PARA_BREAK = /\n[ \t]*\n/;
 
+/** Characters that are ordinary in code and rare in a run of English prose. */
+const CODE_CHARS = /[{};=()<>[\]]/g;
+
+/**
+ * Is this paragraph a code block rather than prose?
+ *
+ * This matters because antirez writes code inside the same `<pre>` as the
+ * article and never wraps it in `<code>` — so the `:not(:has(code))` guard on
+ * the selector is inert on that site, and a code paragraph would otherwise be
+ * handed to the translator as if it were a sentence.
+ *
+ * The signal is indentation: across the articles I checked, EVERY code block is
+ * indented on every line and NO prose paragraph is indented at all. Requiring a
+ * couple of code-ish characters too keeps an indented pull-quote out of it.
+ * Deliberately conservative — a missed code block is ugly, but a prose
+ * paragraph wrongly skipped is text the reader silently never gets.
+ */
+function looksLikeCodeBlock(text: string): boolean {
+  const lines = text.split('\n').filter((line) => line.trim());
+  if (!lines.length) return false;
+  if (!lines.every((line) => /^[ \t]{2,}/.test(line))) return false;
+  return (text.match(CODE_CHARS)?.length ?? 0) >= 2;
+}
+
 /**
  * Split an element into one wrapper per paragraph and return the wrappers.
  *
@@ -141,6 +165,13 @@ function paragraphUnits(el: HTMLElement): HTMLElement[] {
 
   const flush = (): void => {
     if (!current.length) return;
+    const runText = current.map((n) => n.textContent ?? '').join('');
+    if (looksLikeCodeBlock(runText)) {
+      // Leave code where it is: unwrapped, so it never becomes a block.
+      rebuilt.push(...current);
+      current = [];
+      return;
+    }
     if (current.some((n) => (n.textContent ?? '').trim())) {
       const wrapper = document.createElement('span');
       wrapper.setAttribute(PARA_ATTR, 'true');
@@ -161,8 +192,10 @@ function paragraphUnits(el: HTMLElement): HTMLElement[] {
       current.push(node);
       continue;
     }
-    // Capturing split: separators come back as their own entries.
-    for (const part of (node.textContent ?? '').split(/(\n[ \t]*\n[ \t\n]*)/)) {
+    // Capturing split: separators come back as their own entries. The pattern
+    // ends on a newline on purpose — a trailing `[ \t]*` would swallow the NEXT
+    // line's indentation, and indentation is exactly what marks a code block.
+    for (const part of (node.textContent ?? '').split(/(\n(?:[ \t]*\n)+)/)) {
       if (!part) continue;
       if (PARA_BREAK.test(part) && !part.trim()) {
         flush();
