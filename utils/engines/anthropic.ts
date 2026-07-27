@@ -1,4 +1,5 @@
-import { ENGINE_ENDPOINTS, ENGINE_MODELS } from '../constants';
+import { ENGINE_ENDPOINTS } from '../constants';
+import { DEFAULT_MODEL_IDS } from '../models';
 import type { TranslationEngine } from './types';
 import {
   buildTranslationPrompt,
@@ -16,7 +17,8 @@ interface AnthropicResponse {
 }
 
 export const anthropicEngine: TranslationEngine = {
-  async translate(apiKey, paragraphs, mode, subtitleContext, lang) {
+  async translate(apiKey, paragraphs, mode, subtitleContext, lang, modelId) {
+    const model = modelId ?? DEFAULT_MODEL_IDS.anthropic;
     if (mode === 'segment') {
       const prompt = buildSegmentationPrompt(paragraphs);
       const response = await callWithRetry(() =>
@@ -29,7 +31,7 @@ export const anthropicEngine: TranslationEngine = {
             'anthropic-dangerous-direct-browser-access': 'true',
           },
           body: JSON.stringify({
-            model: ENGINE_MODELS.anthropic,
+            model,
             max_tokens: 8192,
             messages: [{ role: 'user', content: prompt }],
           }),
@@ -64,7 +66,7 @@ export const anthropicEngine: TranslationEngine = {
           'anthropic-dangerous-direct-browser-access': 'true',
         },
         body: JSON.stringify({
-          model: ENGINE_MODELS.anthropic,
+          model,
           max_tokens: 8192,
           messages: [{ role: 'user', content: prompt }],
         }),

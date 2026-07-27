@@ -1,7 +1,9 @@
 import type { EngineType } from './engines/types';
+import { SELECTED_MODELS_KEY, normalizeSelectedModels, type SelectedModels } from './models';
 
 export interface ExtensionSettings {
   selectedEngine: EngineType;
+  selectedModels: SelectedModels;
   engineApiKeys: Partial<Record<EngineType, string>>;
   translationEnabled: boolean;
 }
@@ -18,12 +20,14 @@ export async function getSettings(): Promise<ExtensionSettings> {
   const [localResult, engineApiKeys] = await Promise.all([
     chrome.storage.local.get<{
       selectedEngine?: EngineType;
+      selectedModels?: SelectedModels;
       translationEnabled?: boolean;
-    }>(['selectedEngine', 'translationEnabled']),
+    }>(['selectedEngine', SELECTED_MODELS_KEY, 'translationEnabled']),
     getApiKeys(),
   ]);
   return {
     selectedEngine: localResult.selectedEngine || 'gemini',
+    selectedModels: normalizeSelectedModels(localResult.selectedModels),
     engineApiKeys,
     translationEnabled: localResult.translationEnabled !== false,
   };
@@ -59,8 +63,18 @@ export async function migrateStorage(): Promise<void> {
   const syncData = await chrome.storage.sync.get(['geminiApiKey', 'engineApiKeys']);
   const localData = await chrome.storage.local.get<{
     engineApiKeys?: Partial<Record<EngineType, string>>;
-  }>('engineApiKeys');
+    selectedModels?: SelectedModels;
+    selectedEngine?: EngineType;
+  }>(['engineApiKeys', SELECTED_MODELS_KEY, 'selectedEngine']);
   const localKeys: Partial<Record<EngineType, string>> = localData.engineApiKeys || {};
+
+  // Existing users had provider selection only. Persist each provider's economy
+  // model as the migration default while preserving any model choices already
+  // saved by a newer version.
+  const selectedModels = normalizeSelectedModels(localData.selectedModels);
+  if (JSON.stringify(selectedModels) !== JSON.stringify(localData.selectedModels || {})) {
+    await chrome.storage.local.set({ [SELECTED_MODELS_KEY]: selectedModels });
+  }
 
   let changed = false;
 
@@ -70,7 +84,9 @@ export async function migrateStorage(): Promise<void> {
       localKeys.gemini = syncData.geminiApiKey as string;
       changed = true;
     }
-    await chrome.storage.local.set({ selectedEngine: 'gemini' });
+    if (!localData.selectedEngine) {
+      await chrome.storage.local.set({ selectedEngine: 'gemini' });
+    }
   }
 
   // Migrate multi-engine keys from sync → local

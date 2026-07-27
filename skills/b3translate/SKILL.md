@@ -93,24 +93,27 @@ manifest.json이 있는 그 폴더 경로를 사용자에게 명확히 알려준
 
 ---
 
-### Phase 3 — 번역 엔진 + API 키 (사용자가 직접 입력)
+### Phase 3 — 번역 모델 + API 키 (사용자가 직접 입력)
 
-먼저 **어떤 엔진**을 쓸지 물어본다. 무료로 시작하려면 Gemini 추천.
+먼저 **어떤 모델**을 쓸지 물어본다. 각 API 키는 제공사별로 공유된다.
 
-| 엔진                             | 키 발급                                     | 가격 (1M 토큰, in/out) | 특징             |
-| -------------------------------- | ------------------------------------------- | ---------------------- | ---------------- |
-| **Gemini 3.1 Flash Lite** (추천) | https://aistudio.google.com/apikey          | $0.25 / $1.50          | 무료 할당량 있음 |
-| GPT-4.1 Nano                     | https://platform.openai.com/api-keys        | $0.10 / $0.40          | 최저가 · 비추론  |
-| Claude Haiku 4.5                 | https://console.anthropic.com/settings/keys | $1.00 / $5.00          | 품질 우선        |
+| 모델                  | 키 발급                                     | 가격 (USD / 1M tokens, input/output) |
+| --------------------- | ------------------------------------------- | ------------------------------------ |
+| Gemini 3.1 Flash Lite | https://aistudio.google.com/apikey          | $0.25 / $1.50                        |
+| Gemini 3.5 Flash Lite | https://aistudio.google.com/apikey          | $0.30 / $2.50                        |
+| GPT-5.4 Nano          | https://platform.openai.com/api-keys        | $0.20 / $1.25                        |
+| GPT-5.6 Luna          | https://platform.openai.com/api-keys        | $1.00 / $6.00                        |
+| Claude Haiku 4.5      | https://console.anthropic.com/settings/keys | $1.00 / $5.00                        |
+| Claude Sonnet 4.6     | https://console.anthropic.com/settings/keys | $3.00 / $15.00                       |
 
 안내 순서:
 
-1. 고른 엔진의 발급 페이지 링크를 준다.
+1. 고른 모델 제공사의 발급 페이지 링크를 준다.
 2. 키를 만들어 **복사**하라고 안내한다. (**키를 채팅에 붙여넣지 말라**고 명확히 말한다.)
 3. Chrome 툴바의 **b3rys translate 아이콘 클릭 → 팝업**에서:
-   - Engine 드롭다운에서 고른 엔진 선택 (라벨 옆 **ⓘ 설명**에 마우스를 올리면 엔진 비교 표가 뜬다)
+   - Model 드롭다운에서 고른 모델 선택 (라벨 옆 **ⓘ**에는 모델별 가격만 표시된다)
    - API Key 칸에 붙여넣기 → 저장(✓)
-4. 키는 브라우저 `chrome.storage`에만 저장되고 외부로 전송되지 않음을 알려준다. (번역 요청만 해당 엔진 API로 직접 전송)
+4. 키는 브라우저 `chrome.storage.local`에만 저장되고 동기화되지 않음을 알려준다. (번역 요청만 해당 제공사 API로 직접 전송)
 
 ---
 
@@ -138,11 +141,11 @@ manifest.json이 있는 그 폴더 경로를 사용자에게 명확히 알려준
 
 **④ 비용 추적**
 
-- 팝업 하단 **COST**에서 누적 비용 확인, 상세보기(▼)로 엔진별 사용량.
-- **Limit**($)로 한도 지정 → 초과 시 번역 자동 차단(비우면 무제한).
+- 팝업 하단 **COST**에서 누적 비용 확인, 상세보기(▼)로 모델별 사용량.
+- **Limit**($)은 누적 예상 비용 도달 후 후속 요청을 차단하는 기준이며 실제 청구액 hard cap은 아니다.
 - 플로팅 버튼 배터리 게이지로 한도 대비 사용량 시각화(초록→노랑→빨강).
 
-번역이 안 나오면 체크: (a) API 키 저장됐는지, (b) 엔진 선택 맞는지, (c) 콘솔(F12)의 `[b3rys]` 에러, (d) 비용 한도 초과 여부.
+번역이 안 나오면 체크: (a) API 키 저장됐는지, (b) 모델/제공사 선택이 맞는지, (c) 콘솔(F12)의 `[b3rys]` 에러, (d) 비용 한도 도달 여부.
 
 ---
 

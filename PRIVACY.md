@@ -25,12 +25,12 @@ b3rys translate(이하 "본 확장 프로그램")은 웹페이지와 YouTube 자
 
 다음 데이터는 사용자의 브라우저에만 저장되며 외부로 전송되지 않습니다:
 
-| 데이터      | 저장 위치              | 설명                                                                 |
-| ----------- | ---------------------- | -------------------------------------------------------------------- |
-| API 키      | `chrome.storage.local` | 사용자가 직접 입력한 번역 API 키. 기기 외부로 동기화되지 않음        |
-| 설정        | `chrome.storage.sync`  | 엔진 선택, 버튼 표시 여부 등 기본 설정                               |
-| 번역 캐시   | `chrome.storage.local` | 번역 결과 캐시 (LRU 방식, 7일 후 자동 만료, 최대 1,000개)            |
-| 사용량 통계 | `chrome.storage.sync`  | 토큰 사용량 및 예상 비용 (로컬 계산, 외부 전송 없음, 기기 간 동기화) |
+| 데이터      | 저장 위치              | 설명                                                                   |
+| ----------- | ---------------------- | ---------------------------------------------------------------------- |
+| API 키      | `chrome.storage.local` | 사용자가 직접 입력한 번역 API 키. 기기 외부로 동기화되지 않음          |
+| 설정        | `chrome.storage.local` | 모델/제공사 선택, 버튼 표시 여부 등 기본 설정. 기기 간 동기화되지 않음 |
+| 번역 캐시   | `chrome.storage.local` | 번역 결과 캐시 (LRU 방식, 7일 후 자동 만료, 최대 4,000개)              |
+| 사용량 통계 | `chrome.storage.local` | 토큰 사용량 및 예상 비용 (로컬 계산, 외부 전송·기기 간 동기화 없음)    |
 
 ### 외부로 전송되는 데이터
 
@@ -91,12 +91,12 @@ The Extension does not operate any servers. No data is ever sent to the develope
 
 The following data is stored exclusively in the user's browser and is never transmitted externally:
 
-| Data              | Storage                | Description                                                                                 |
-| ----------------- | ---------------------- | ------------------------------------------------------------------------------------------- |
-| API Keys          | `chrome.storage.local` | Translation API keys entered by the user. Not synced outside the device                     |
-| Settings          | `chrome.storage.sync`  | Engine selection, button visibility, and other preferences                                  |
-| Translation Cache | `chrome.storage.local` | Cached translation results (LRU, expires after 7 days, max 1,000 entries)                   |
-| Usage Statistics  | `chrome.storage.sync`  | Token usage and estimated cost (computed locally, never transmitted, synced across devices) |
+| Data              | Storage                | Description                                                                                   |
+| ----------------- | ---------------------- | --------------------------------------------------------------------------------------------- |
+| API Keys          | `chrome.storage.local` | Translation API keys entered by the user. Not synced outside the device                       |
+| Settings          | `chrome.storage.local` | Model/provider selection, button visibility, and other preferences. Not synced across devices |
+| Translation Cache | `chrome.storage.local` | Cached translation results (LRU, expires after 7 days, max 4,000 entries)                     |
+| Usage Statistics  | `chrome.storage.local` | Token usage and estimated cost (computed locally, never transmitted or synced across devices) |
 
 ### Data Transmitted Externally
 

@@ -16,7 +16,6 @@ import {
 } from '@/utils/translation-cache';
 import { migrateStorage } from '@/utils/storage';
 import {
-  ENGINE_PRICING,
   USAGE_STATS_KEY,
   COST_LIMIT_KEY,
   USAGE_RATIO_KEY,
@@ -24,6 +23,15 @@ import {
   DEFAULT_SOURCE_LANG,
   DEFAULT_TARGET_LANG,
 } from '@/utils/constants';
+import {
+  SELECTED_MODELS_KEY,
+  calculateModelCost,
+  resolveSelectedModel,
+  type ModelId,
+  type SelectedModels,
+} from '@/utils/models';
+import { buildTranslationCachePrefix } from '@/utils/translation-context';
+import type { TranslationRequestMode } from '@/utils/translation-types';
 
 interface EngineUsageStats {
   inputTokens: number;
@@ -32,7 +40,7 @@ interface EngineUsageStats {
   requestCount: number;
 }
 
-type UsageStats = Partial<Record<EngineType, EngineUsageStats>>;
+type UsageStats = Partial<Record<string, EngineUsageStats>>;
 
 // Rate limiter: prevent excessive API calls from any source (cost protection)
 const RATE_WINDOW = 60_000; // 1 minute
@@ -132,15 +140,6 @@ export default defineBackground(() => {
   );
 });
 
-function calculateCost(engineType: EngineType, usage: UsageData): number {
-  const pricing = ENGINE_PRICING[engineType];
-  if (!pricing) return 0;
-  return (
-    (usage.inputTokens / 1_000_000) * pricing.input +
-    (usage.outputTokens / 1_000_000) * pricing.output
-  );
-}
-
 // --- Usage/cost accounting (in-memory accumulator + debounced flush) ---
 // Writing stats on every batch (2 storage writes × ~56 batches on a long page)
 // was hammering storage — and in chrome.storage.sync it blew the 120/min write
@@ -168,18 +167,18 @@ async function getUsageStats(): Promise<UsageStats> {
 }
 
 /** Accumulate a batch's usage in memory and schedule a coalesced flush. */
-function recordUsage(engineType: EngineType, usage: UsageData): void {
+function recordUsage(modelId: ModelId, usage: UsageData): void {
   const stats = usageStatsCache ?? (usageStatsCache = {});
-  const prev = stats[engineType] || {
+  const prev = stats[modelId] || {
     inputTokens: 0,
     outputTokens: 0,
     estimatedCost: 0,
     requestCount: 0,
   };
-  stats[engineType] = {
+  stats[modelId] = {
     inputTokens: prev.inputTokens + usage.inputTokens,
     outputTokens: prev.outputTokens + usage.outputTokens,
-    estimatedCost: prev.estimatedCost + calculateCost(engineType, usage),
+    estimatedCost: prev.estimatedCost + calculateModelCost(modelId, usage),
     requestCount: prev.requestCount + 1,
   };
   scheduleUsageFlush();
@@ -243,11 +242,6 @@ async function resolveTargetLang(msgTargetLang?: string): Promise<string> {
   return stored?.target || DEFAULT_TARGET_LANG;
 }
 
-/** Cache key prefix — single source of truth for lookup and store paths. */
-function cacheKeyPrefix(targetLang: string, mode?: 'page' | 'subtitle' | 'word' | 'segment') {
-  return `${targetLang}:${mode === 'word' ? 'w:' : ''}`;
-}
-
 /**
  * Pure cache read — no API call, no rate-limit slot, no usage stats.
  * Returns only the hits; the content script paints them instantly and
@@ -258,7 +252,17 @@ async function handleCacheLookup(
   msgTargetLang?: string,
 ): Promise<CacheLookupResponse> {
   await loadCache();
-  const prefix = cacheKeyPrefix(await resolveTargetLang(msgTargetLang), 'page');
+  const { selectedEngine, selectedModels } = await chrome.storage.local.get<{
+    selectedEngine?: EngineType;
+    selectedModels?: SelectedModels;
+  }>(['selectedEngine', SELECTED_MODELS_KEY]);
+  const engineType = selectedEngine || 'gemini';
+  const modelId = resolveSelectedModel(engineType, selectedModels?.[engineType]);
+  const prefix = buildTranslationCachePrefix(
+    await resolveTargetLang(msgTargetLang),
+    'page',
+    modelId,
+  );
   const translations: { id: string; translatedText: string }[] = [];
   for (const p of paragraphs) {
     const hit = getCached(prefix + p.text);
@@ -269,17 +273,16 @@ async function handleCacheLookup(
 
 async function handleTranslateBatch(
   paragraphs: { id: string; text: string }[],
-  mode?: 'page' | 'subtitle' | 'word' | 'segment',
+  mode?: TranslationRequestMode,
   subtitleContext?: { original: string; translated: string }[],
   msgSourceLang?: string,
   msgTargetLang?: string,
 ): Promise<TranslateBatchResponse> {
-  const { selectedEngine } = await chrome.storage.local.get<{
+  const { selectedEngine, selectedModels, engineApiKeys } = await chrome.storage.local.get<{
     selectedEngine?: EngineType;
-  }>('selectedEngine');
-  const { engineApiKeys } = await chrome.storage.local.get<{
+    selectedModels?: SelectedModels;
     engineApiKeys?: Partial<Record<EngineType, string>>;
-  }>('engineApiKeys');
+  }>(['selectedEngine', SELECTED_MODELS_KEY, 'engineApiKeys']);
 
   // Resolve language pair: message override > storage > defaults
   // Source language is auto-detected by LLM — only target language is configurable
@@ -288,6 +291,7 @@ async function handleTranslateBatch(
   const lang = { sourceLang, targetLang };
 
   const engineType: EngineType = selectedEngine || 'gemini';
+  const modelId = resolveSelectedModel(engineType, selectedModels?.[engineType]);
 
   const apiKey = engineApiKeys?.[engineType];
 
@@ -320,10 +324,10 @@ async function handleTranslateBatch(
       return { translations: [], error: rateLimitError };
     }
     const engine = getEngine(engineType);
-    const result = await engine.translate(apiKey, paragraphs, 'segment', undefined, lang);
+    const result = await engine.translate(apiKey, paragraphs, 'segment', undefined, lang, modelId);
 
     if (result.usage) {
-      recordUsage(engineType, result.usage);
+      recordUsage(modelId, result.usage);
     }
 
     const newTotal = await getTotalCost(stats);
@@ -333,7 +337,7 @@ async function handleTranslateBatch(
   await loadCache();
 
   // Check cache for each paragraph (include target lang + mode in cache key)
-  const cachePrefix = cacheKeyPrefix(targetLang, mode);
+  const cachePrefix = buildTranslationCachePrefix(targetLang, mode, modelId);
   const cached: { id: string; translatedText: string }[] = [];
   const uncached: { id: string; text: string }[] = [];
 
@@ -359,7 +363,14 @@ async function handleTranslateBatch(
 
   // Dispatch to selected engine
   const engine = getEngine(engineType);
-  const result = await engine.translate(apiKey, uncached, mode ?? 'page', subtitleContext, lang);
+  const result = await engine.translate(
+    apiKey,
+    uncached,
+    mode ?? 'page',
+    subtitleContext,
+    lang,
+    modelId,
+  );
 
   // Store new translations in cache
   for (const t of result.translations) {
@@ -372,7 +383,7 @@ async function handleTranslateBatch(
 
   // Accumulate usage stats (coalesced flush — see recordUsage)
   if (result.usage) {
-    recordUsage(engineType, result.usage);
+    recordUsage(modelId, result.usage);
   }
 
   const newTotal = await getTotalCost(stats);

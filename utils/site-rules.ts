@@ -4,6 +4,8 @@
  */
 
 export interface SiteRule {
+  /** Apply this hostname rule only when the current path matches. */
+  pathPattern?: RegExp;
   /** Inject translation as sibling for inline elements (default: false) */
   injectAsSibling?: boolean;
   /** Override main content selector for viewport priority */
@@ -54,6 +56,15 @@ const SITE_RULES: Record<string, SiteRule> = {
     onlyWithin: ['[role="main"]'],
     mainContentSelector: '[role="main"]',
   },
+  'antirez.com': {
+    // antirez renders article prose inside a single <pre>. Keep PRE globally
+    // skipped for code safety and opt in only the verified /news/169 structure.
+    pathPattern: /^\/news\/169\/?$/,
+    translateSelectors: [
+      '#newslist article[data-news-id="169"] h2',
+      'topcomment article.comment > pre:not(:has(code))',
+    ],
+  },
   'skilljar.com': {
     injectAsSibling: true,
     skipSelectors: ['.clp__enroll-btn', 'header'],
@@ -66,15 +77,19 @@ const SITE_RULES: Record<string, SiteRule> = {
  */
 export function getSiteRule(): SiteRule | null {
   const host = location.hostname;
+  const path = location.pathname;
+
+  const applicable = (rule: SiteRule | undefined): rule is SiteRule =>
+    !!rule && (!rule.pathPattern || rule.pathPattern.test(path));
 
   // Exact match
-  if (SITE_RULES[host]) return SITE_RULES[host];
+  if (applicable(SITE_RULES[host])) return SITE_RULES[host];
 
   // Parent domain match (e.g. foo.substack.com → substack.com)
   const parts = host.split('.');
   for (let i = 1; i < parts.length - 1; i++) {
     const parent = parts.slice(i).join('.');
-    if (SITE_RULES[parent]) return SITE_RULES[parent];
+    if (applicable(SITE_RULES[parent])) return SITE_RULES[parent];
   }
 
   return null;

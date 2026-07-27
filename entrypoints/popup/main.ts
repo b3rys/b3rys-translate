@@ -1,13 +1,21 @@
 import type { EngineType } from '@/utils/engines/types';
 import { ENGINE_DISPLAY_NAMES } from '@/utils/engines/types';
 import {
+  SELECTED_MODELS_KEY,
+  getModelConfig,
+  normalizeSelectedModels,
+  resolveSelectedModel,
+  type ModelId,
+  type SelectedModels,
+} from '@/utils/models';
+import { populateModelSelect, renderModelPricingTable } from './model-ui';
+import {
   USAGE_STATS_KEY,
   COST_LIMIT_KEY,
   USAGE_RATIO_KEY,
   LANGUAGES,
   LANG_STORAGE_KEY,
   DEFAULT_TARGET_LANG,
-  ENGINE_PRICING,
 } from '@/utils/constants';
 
 // Key issuance pages — the first-run path. (Usage dashboards live one click
@@ -18,39 +26,6 @@ const ENGINE_KEY_URLS: Record<EngineType, string> = {
   anthropic: 'https://console.anthropic.com/settings/keys',
 };
 
-// 엔진 비교 툴팁용 한줄 설명 (가격은 ENGINE_PRICING 단일 출처에서 파생)
-const ENGINE_NOTES: Record<EngineType, string> = {
-  gemini: '무료 할당량·권장',
-  openai: '최저가·비추론',
-  anthropic: '품질 우선',
-};
-
-/** 팝업 엔진 목록/툴팁을 ENGINE_DISPLAY_NAMES + ENGINE_PRICING에서 생성 (엔진 추가 시 이 데이터만 갱신) */
-function populateEngineUI(engineSelect: HTMLSelectElement, tooltip: HTMLElement) {
-  const entries = Object.entries(ENGINE_DISPLAY_NAMES) as [EngineType, string][];
-
-  engineSelect.innerHTML = '';
-  for (const [type, name] of entries) {
-    const opt = document.createElement('option');
-    opt.value = type;
-    opt.textContent = name;
-    engineSelect.appendChild(opt);
-  }
-
-  const rows = entries
-    .map(([type, name]) => {
-      const p = ENGINE_PRICING[type];
-      const price = p ? `$${p.input.toFixed(2)}/${p.output.toFixed(2)}` : '—';
-      return `<tr><td>${name}</td><td class="tt-price">${price}</td><td class="tt-note">${ENGINE_NOTES[type] ?? ''}</td></tr>`;
-    })
-    .join('');
-  tooltip.innerHTML =
-    '<div class="info-tooltip-title">번역 엔진 비교</div>' +
-    '<table><thead><tr><th>엔진</th><th>가격</th><th>특징</th></tr></thead>' +
-    `<tbody>${rows}</tbody></table>` +
-    '<div class="info-tooltip-foot">가격 = 1M 토큰당 입력/출력 (USD). 비용대비 품질 기준.</div>';
-}
-
 interface EngineUsageStats {
   inputTokens: number;
   outputTokens: number;
@@ -58,7 +33,7 @@ interface EngineUsageStats {
   requestCount: number;
 }
 
-type UsageStats = Partial<Record<EngineType, EngineUsageStats>>;
+type UsageStats = Partial<Record<string, EngineUsageStats>>;
 
 document.addEventListener('DOMContentLoaded', async () => {
   const engineSelect = document.getElementById('engine-select') as HTMLSelectElement;
@@ -81,19 +56,28 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Load saved settings (all in storage.local — sync is no longer used; see
   // migrateStorage note on why every setting moved off sync)
-  const { selectedEngine, floatingButtonVisible, ytButtonVisible, autoTranslate } =
+  const { selectedEngine, selectedModels, floatingButtonVisible, ytButtonVisible, autoTranslate } =
     await chrome.storage.local.get<{
       selectedEngine?: EngineType;
+      selectedModels?: SelectedModels;
       floatingButtonVisible?: boolean;
       ytButtonVisible?: boolean;
       autoTranslate?: boolean;
-    }>(['selectedEngine', 'floatingButtonVisible', 'ytButtonVisible', 'autoTranslate']);
+    }>([
+      'selectedEngine',
+      SELECTED_MODELS_KEY,
+      'floatingButtonVisible',
+      'ytButtonVisible',
+      'autoTranslate',
+    ]);
 
   const { engineApiKeys } = await chrome.storage.local.get<{
     engineApiKeys?: Partial<Record<EngineType, string>>;
   }>('engineApiKeys');
 
   const currentEngine: EngineType = selectedEngine || 'gemini';
+  const modelSelections = normalizeSelectedModels(selectedModels);
+  let currentModel = resolveSelectedModel(currentEngine, modelSelections[currentEngine]);
   const keys: Partial<Record<EngineType, string>> = engineApiKeys || {};
 
   // Check for API key error message from content script
@@ -122,13 +106,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     errorBanner.style.display = 'none';
   });
 
-  // Build engine dropdown + comparison tooltip from single-source metadata
+  // Build model dropdown + price-only tooltip from single-source metadata.
   const engineTooltip = document.getElementById('engine-tooltip') as HTMLSpanElement;
-  populateEngineUI(engineSelect, engineTooltip);
+  populateModelSelect(engineSelect);
+  renderModelPricingTable(engineTooltip);
 
-  engineSelect.value = currentEngine;
+  engineSelect.value = currentModel;
   loadKeyForEngine(currentEngine);
-  updateBadge(currentEngine);
+  updateBadge(currentModel);
 
   // --- Language selection ---
   const targetLangSelect = document.getElementById('target-lang') as HTMLSelectElement;
@@ -171,12 +156,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   autoToggle.checked = isAutoOn;
   updateAutoStatus(isAutoOn);
 
-  // Engine selection change
+  // Model selection change. Provider-scoped API keys remain unchanged.
   engineSelect.addEventListener('change', async () => {
-    const engine = engineSelect.value as EngineType;
-    await chrome.storage.local.set({ selectedEngine: engine });
+    const model = getModelConfig(engineSelect.value as ModelId);
+    const engine = model.engine;
+    currentModel = model.id;
+    modelSelections[engine] = model.id;
+    await chrome.storage.local.set({
+      selectedEngine: engine,
+      [SELECTED_MODELS_KEY]: { ...modelSelections },
+    });
     loadKeyForEngine(engine);
-    updateBadge(engine);
+    updateBadge(model.id);
   });
 
   // Save API key
@@ -184,7 +175,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const key = apiKeyInput.value.trim();
     if (!key || key.startsWith('••••')) return;
 
-    const engine = engineSelect.value as EngineType;
+    const engine = getModelConfig(engineSelect.value as ModelId).engine;
     try {
       keys[engine] = key;
       await chrome.storage.local.set({ engineApiKeys: { ...keys } });
@@ -197,7 +188,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Delete API key
   deleteButton.addEventListener('click', async () => {
-    const engine = engineSelect.value as EngineType;
+    const engine = getModelConfig(engineSelect.value as ModelId).engine;
     delete keys[engine];
     await chrome.storage.local.set({ engineApiKeys: { ...keys } });
     apiKeyInput.value = '';
@@ -270,13 +261,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       apiKeyInput.value = '';
       keyStatus.className = 'status';
     }
-    apiKeyInput.placeholder = `${ENGINE_DISPLAY_NAMES[engine]} API key`;
+    apiKeyInput.placeholder = `${getModelConfig(currentModel).label} API key`;
   }
 
-  function updateBadge(engine: EngineType) {
-    badgeModel.textContent = ENGINE_DISPLAY_NAMES[engine];
-    badgeLink.href = ENGINE_KEY_URLS[engine];
-    keyIssueLink.href = ENGINE_KEY_URLS[engine];
+  function updateBadge(modelId: ModelId) {
+    const model = getModelConfig(modelId);
+    badgeModel.textContent = model.label;
+    badgeLink.href = ENGINE_KEY_URLS[model.engine];
+    keyIssueLink.href = ENGINE_KEY_URLS[model.engine];
   }
 
   function showStatus(text: string, type: 'success' | 'error') {
@@ -380,20 +372,30 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function renderCostTable(stats: UsageStats) {
     costTableBody.innerHTML = '';
-    const engines = Object.keys(stats) as EngineType[];
-    if (engines.length === 0) {
+    const usageKeys = Object.keys(stats);
+    if (usageKeys.length === 0) {
       const row = document.createElement('tr');
       row.innerHTML =
         '<td colspan="3" style="text-align:center;color:var(--text-muted)">No usage data</td>';
       costTableBody.appendChild(row);
       return;
     }
-    for (const eng of engines) {
-      const s = stats[eng];
+    for (const usageKey of usageKeys) {
+      const s = stats[usageKey];
       if (!s) continue;
       const usage = `${formatNumber(s.inputTokens + s.outputTokens)} tokens`;
       const row = document.createElement('tr');
-      row.innerHTML = `<td>${ENGINE_DISPLAY_NAMES[eng] ?? eng}</td><td>${usage}</td><td>$${s.estimatedCost.toFixed(4)}</td>`;
+      let label: string;
+      try {
+        label = getModelConfig(usageKey as ModelId).label;
+      } catch {
+        label = ENGINE_DISPLAY_NAMES[usageKey as EngineType] ?? usageKey;
+      }
+      for (const text of [label, usage, `$${s.estimatedCost.toFixed(4)}`]) {
+        const cell = document.createElement('td');
+        cell.textContent = text;
+        row.appendChild(cell);
+      }
       costTableBody.appendChild(row);
     }
   }

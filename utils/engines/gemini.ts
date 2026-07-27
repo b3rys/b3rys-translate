@@ -1,4 +1,4 @@
-import { ENGINE_ENDPOINTS } from '../constants';
+import { DEFAULT_MODEL_IDS, type ModelId } from '../models';
 import type { TranslationEngine } from './types';
 import {
   buildTranslationPrompt,
@@ -26,9 +26,11 @@ interface GeminiResponse {
 async function callGeminiAPI(
   apiKey: string,
   prompt: string,
+  modelId: ModelId,
 ): Promise<{ text: string; usage?: UsageData }> {
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent`;
   const response = await callWithRetry(() =>
-    fetch(ENGINE_ENDPOINTS.gemini, {
+    fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -37,7 +39,6 @@ async function callGeminiAPI(
       body: JSON.stringify({
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         generationConfig: {
-          temperature: 0.1,
           maxOutputTokens: 8192,
         },
       }),
@@ -65,10 +66,11 @@ async function callGeminiAPI(
 }
 
 export const geminiEngine: TranslationEngine = {
-  async translate(apiKey, paragraphs, mode, subtitleContext, lang) {
+  async translate(apiKey, paragraphs, mode, subtitleContext, lang, modelId) {
+    const model = modelId ?? DEFAULT_MODEL_IDS.gemini;
     if (mode === 'segment') {
       const prompt = buildSegmentationPrompt(paragraphs);
-      const { text, usage } = await callGeminiAPI(apiKey, prompt);
+      const { text, usage } = await callGeminiAPI(apiKey, prompt, model);
       return {
         translations: [{ id: '__raw__', translatedText: text.trim() }],
         usage,
@@ -81,7 +83,7 @@ export const geminiEngine: TranslationEngine = {
         : mode === 'subtitle'
           ? buildSubtitleTranslationPrompt(paragraphs, subtitleContext, lang)
           : buildTranslationPrompt(paragraphs, lang);
-    const { text, usage } = await callGeminiAPI(apiKey, prompt);
+    const { text, usage } = await callGeminiAPI(apiKey, prompt, model);
     return {
       translations: parseTranslationResponse(text, paragraphs),
       usage,
