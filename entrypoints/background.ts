@@ -48,7 +48,7 @@ const RATE_WINDOW = 60_000; // 1 minute
 // BATCH_SIZE paragraphs / SUBTITLE_BATCH_SIZE cues), and this counter is global
 // across every tab + YouTube rolling translation, so it must sit well above
 // legitimate heavy use (long pages, multi-tab, a talky video). The real
-// runaway-loop guard is content.ts's circuit breaker (15 starts/min); this is
+// runaway-loop guard is translation-state.ts's circuit breaker (30 starts/min); this is
 // only the last-resort cost cap.
 const RATE_MAX_CALLS = 150; // max API calls per window (cache hits don't count)
 const recentApiCalls: number[] = [];
