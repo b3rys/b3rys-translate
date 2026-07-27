@@ -103,9 +103,16 @@ utils/
 ## 빌드 규칙 (필수)
 
 - **코드 수정 후 반드시 `npm run build` 실행** — 사용자가 `npm run dev`를 항상 켜두지 않으므로, 코드 변경 후에는 `npm run build`로 dist를 갱신해야 함
-- 테스트 검증 순서: `npm run test` → `npm run lint` → `npm run build`
+- 테스트 검증 순서: `npm run test` → `npm run lint` → `npm run typecheck` → `npm run build`
 - build 실패 시 사용자에게 테스트 요청하지 말 것
 - **배포(GitHub Release·웹스토어) 전 [docs/release-checklist.md](docs/release-checklist.md) 인수테스트 필수 통과** — 자동 테스트는 이를 대체하지 못한다. 속도/구조 개선이 기본 기능을 깨면 개선을 롤백한다 (기능 우선)
+
+## Mac Studio Chrome 실환경 검증
+
+- b3rys-translate의 실제 브라우저 검증에는 **Mac Studio Chrome의 일반 탭을 사용해도 된다**. 테스트용 탭을 새로 열거나 기존 b3rys-translate 관련 탭을 사용할 수 있다.
+- 자동 테스트는 실제 Chrome 검증을 대체하지 않으며, 실제 Chrome 검증도 전체 test·lint·typecheck·build를 대체하지 않는다.
+- 개인 페이지나 unrelated 탭은 불필요하게 조작하지 않고, API 키·계정 정보 등 자격 증명 값은 읽거나 기록하지 않는다.
+- **YouTube 테스트를 수행했다면 종료 전에 반드시 영상을 일시정지하고, 실제 재생이 멈췄는지 다시 확인한다.** 단순히 테스트 탭을 떠나거나 음소거하는 것으로 대신하지 않는다.
 
 ## 기능별 상세 룰 (스킬)
 
@@ -121,7 +128,7 @@ utils/
 ## Key Decisions
 
 - 번역 방향: EN → KO 고정
-- API 키: chrome.storage.sync에 저장 (사용자가 popup에서 입력)
+- API 키와 설정: `chrome.storage.local`에 저장 (사용자가 popup에서 입력, 기기 간 동기화 안 함)
 - Floating button: Shadow DOM으로 CSS 격리
 - 번역 단위: 문단(paragraph) 단위, viewport-first 병렬 배치
 - 번역문 스타일: 원문 아래에 원문과 동일한 색상으로 표시

@@ -1,4 +1,5 @@
-import { ENGINE_ENDPOINTS, ENGINE_MODELS } from '../constants';
+import { ENGINE_ENDPOINTS } from '../constants';
+import { DEFAULT_MODEL_IDS } from '../models';
 import type { TranslationEngine } from './types';
 import {
   buildTranslationPrompt,
@@ -16,7 +17,8 @@ interface OpenAIResponse {
 }
 
 export const openaiEngine: TranslationEngine = {
-  async translate(apiKey, paragraphs, mode, subtitleContext, lang) {
+  async translate(apiKey, paragraphs, mode, subtitleContext, lang, modelId) {
+    const model = modelId ?? DEFAULT_MODEL_IDS.openai;
     if (mode === 'segment') {
       const prompt = buildSegmentationPrompt(paragraphs);
       const response = await callWithRetry(() =>
@@ -27,9 +29,9 @@ export const openaiEngine: TranslationEngine = {
             Authorization: `Bearer ${apiKey}`,
           },
           body: JSON.stringify({
-            model: ENGINE_MODELS.openai,
+            model,
             messages: [{ role: 'user', content: prompt }],
-            temperature: 0.1,
+            reasoning_effort: 'none',
           }),
         }),
       );
@@ -60,9 +62,9 @@ export const openaiEngine: TranslationEngine = {
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: ENGINE_MODELS.openai,
+          model,
           messages: [{ role: 'user', content: prompt }],
-          temperature: 0.1,
+          reasoning_effort: 'none',
         }),
       }),
     );

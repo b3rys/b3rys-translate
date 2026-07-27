@@ -1,7 +1,9 @@
+import type { TranslationRequestMode } from './translation-types';
+
 export interface TranslateBatchRequest {
   type: 'TRANSLATE_BATCH';
   paragraphs: { id: string; text: string }[];
-  mode?: 'page' | 'subtitle' | 'word' | 'segment';
+  mode?: TranslationRequestMode;
   subtitleContext?: { original: string; translated: string }[];
   sourceLang?: string;
   targetLang?: string;

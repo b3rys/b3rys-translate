@@ -5,15 +5,9 @@ export const ENGINE_ENDPOINTS = {
   anthropic: 'https://api.anthropic.com/v1/messages',
 } as const;
 
-export const ENGINE_MODELS = {
-  gemini: 'gemini-3.1-flash-lite',
-  openai: 'gpt-4.1-nano',
-  anthropic: 'claude-haiku-4-5-20251001',
-} as const;
-
 /** Logged at content-script startup so the running bundle can be identified
  * in DevTools (stale bundles after a rebuild look identical otherwise). */
-export const BUILD_TAG = '0.5.7';
+export const BUILD_TAG = '0.5.12';
 
 export const BATCH_SIZE = 15;
 export const VIEWPORT_BATCH_SIZE = 5;
@@ -96,13 +90,6 @@ export const YT_TRANSLATION_CLASS = 'b3rys-subtitle-translation';
 export const CACHE_MAX_ENTRIES = 4000;
 export const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 export const CACHE_STORAGE_KEY = 'b3rys_translation_cache';
-
-// USD per 1M tokens
-export const ENGINE_PRICING: Record<string, { input: number; output: number; unit: 'tokens' }> = {
-  gemini: { input: 0.25, output: 1.5, unit: 'tokens' },
-  openai: { input: 0.1, output: 0.4, unit: 'tokens' },
-  anthropic: { input: 1.0, output: 5.0, unit: 'tokens' },
-};
 
 // Usage stats storage key
 export const USAGE_STATS_KEY = 'b3rys_usage_stats';

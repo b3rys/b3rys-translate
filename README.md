@@ -37,10 +37,10 @@ YouTube 이중자막(원문 + 번역)도 지원합니다.
 - **10개 언어 지원** — 타겟 언어 선택, 소스 자동 감지, 언어별 캐시 분리
 - **YouTube 이중자막** — 원문 + 번역 오버레이, rolling 번역, 표시 모드 순환
 - **단어/문장 선택 번역** — 드래그 팝업, 단어 모드는 예문 2개 + 발음 듣기
-- **다중 엔진** — Gemini / OpenAI / Anthropic 자유 전환, 엔진별 키 독립 저장
+- **다중 모델** — Gemini / OpenAI / Anthropic 모델 선택, 제공사별 키 독립 저장
 - **비용 추적** — 누적 비용·토큰 사용량 표시, 한도 설정, 플로팅 버튼 배터리 게이지
 - **동적 콘텐츠 대응** — MutationObserver로 무한 스크롤·SPA 자동 번역
-- **LRU 캐시** — 번역 결과 캐싱 (TTL 7일, 최대 1000개)
+- **LRU 캐시** — 번역 결과 캐싱 (TTL 7일, 최대 4,000개)
 
 ---
 
@@ -124,19 +124,20 @@ npm run build
 
 **4. API 키 설정**
 
-Chrome 툴바에서 확장 프로그램 아이콘 클릭 → 팝업에서 엔진 선택 및 API 키 입력.
-(Engine 라벨 옆 **ⓘ 설명**에 마우스를 올리면 엔진별 가격·특징 비교 표가 뜹니다.)
+Chrome 툴바에서 확장 프로그램 아이콘 클릭 → 팝업에서 모델 선택 및 API 키 입력.
+(Model 라벨 옆 **ⓘ**에 마우스를 올리면 모델별 입력/출력 가격이 표시됩니다.)
 
 <img src="docs/popup-settings.jpeg" width="300">
 
-| 엔진                      | 발급 위치                                                        | 가격 (1M 토큰, in/out) | 비고               |
-| ------------------------- | ---------------------------------------------------------------- | ---------------------- | ------------------ |
-| **Gemini 3.1 Flash Lite** | [Google AI Studio](https://aistudio.google.com/apikey)           | $0.25 / $1.50          | 무료 할당량 · 권장 |
-| **GPT-4.1 Nano**          | [OpenAI Platform](https://platform.openai.com/api-keys)          | $0.10 / $0.40          | 최저가 · 비추론    |
-| **Claude Haiku 4.5**      | [Anthropic Console](https://console.anthropic.com/settings/keys) | $1.00 / $5.00          | 품질 우선          |
+| 모델                      | 키 발급 위치                                                     | 가격 (USD / 1M tokens, input/output) |
+| ------------------------- | ---------------------------------------------------------------- | ------------------------------------ |
+| **Gemini 3.1 Flash Lite** | [Google AI Studio](https://aistudio.google.com/apikey)           | $0.25 / $1.50                        |
+| **GPT-5.4 Nano**          | [OpenAI Platform](https://platform.openai.com/api-keys)          | $0.20 / $1.25                        |
+| **GPT-5.6 Luna**          | [OpenAI Platform](https://platform.openai.com/api-keys)          | $1.00 / $6.00                        |
+| **Claude Haiku 4.5**      | [Anthropic Console](https://console.anthropic.com/settings/keys) | $1.00 / $5.00                        |
 
-엔진별로 API 키가 독립 저장되므로, 여러 엔진의 키를 미리 설정해 두고 자유롭게 전환할 수 있습니다.
-API 키는 브라우저의 `chrome.storage`에만 저장되며 외부로 전송되지 않습니다 (번역 요청은 사용자가 선택한 엔진 API로 직접 전송).
+API 키는 제공사별로 독립 저장되므로 같은 제공사의 모델은 하나의 키를 공유합니다.
+API 키는 브라우저의 `chrome.storage.local`에만 저장되며 외부로 동기화되지 않습니다 (번역 요청은 사용자가 선택한 제공사 API로 직접 전송).
 
 ---
 
@@ -169,8 +170,8 @@ API 키는 브라우저의 `chrome.storage`에만 저장되며 외부로 전송�
 ### 비용 추적
 
 - 팝업 하단 **COST**에서 누적 비용 확인
-- 상세보기(▼) 클릭 시 엔진별 토큰 사용량 + 비용 표시
-- **Limit** 설정으로 비용 한도 지정 (초과 시 번역 자동 차단, 비워두면 무제한)
+- 상세보기(▼) 클릭 시 모델별 토큰 사용량 + 예상 비용 표시
+- **Limit**은 누적 예상 비용이 도달한 뒤 후속 요청을 차단하는 기준입니다. 제공사 실제 청구액의 hard cap이 아니며 진행 중 요청으로 초과할 수 있습니다
 - 플로팅 버튼에 배터리 게이지로 한도 대비 사용량 시각화 (초록→노랑→빨강)
 - 초기화(↻) 버튼으로 사용량 리셋
 
@@ -181,7 +182,7 @@ API 키는 브라우저의 `chrome.storage`에만 저장되며 외부로 전송�
 ```bash
 npm run dev          # 개발 모드 (HMR, Chrome 자동 로드)
 npm run build        # 프로덕션 빌드
-npm run test         # 테스트 실행 (252 tests)
+npm run test         # 전체 테스트 실행
 npm run typecheck    # 타입 체크
 npm run lint         # ESLint 검사
 npm run format       # Prettier 포맷 적용
@@ -198,7 +199,7 @@ npm run zip          # 배포용 zip 생성
 
 - **Framework**: [WXT](https://wxt.dev/) (Web Extension Framework) + Manifest V3
 - **Language**: TypeScript (vanilla, no framework)
-- **Test**: Vitest + happy-dom (252 tests)
+- **Test**: Vitest + happy-dom
 
 ### 기술 문서
 

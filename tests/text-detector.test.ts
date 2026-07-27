@@ -158,6 +158,34 @@ describe('SKIP_TAGS ignored', () => {
     expect(texts.some((t) => t.includes('skipThisToo'))).toBe(false);
     expect(texts.some((t) => t.includes('SVG text'))).toBe(false);
   });
+
+  /**
+   * 위 테스트는 SKIP_TAGS 를 실제로 지키지 못한다 — 하네스 리뷰에서 드러났다.
+   * SKIP_TAGS 에서 'CODE','PRE' 를 지워도 전부 통과한다. 독립된 <code>/<script>
+   * 는 애초에 TRANSLATABLE_TAGS 에 없어서 어느 단계에서도 안 잡히기 때문이다.
+   * 즉 다른 이유로 통과하고 있었고, 안전장치가 사라져도 CI 는 조용했다.
+   *
+   * SKIP_TAGS 가 실제로 일하는 곳은 ★번역 대상 안에 섞인 인라인 코드★ 다.
+   * <p> 는 번역 대상이라 텍스트를 모으는데, 그 안의 <code> 를 빼주는 것이
+   * SKIP_TAGS 다. 그래서 그 경우로 고정한다 — 이 테스트는 SKIP_TAGS 에서
+   * CODE 를 지우면 실제로 실패한다.
+   */
+  it('keeps inline code out of a translatable paragraph (SKIP_TAGS 실효 고정)', () => {
+    setupDOM(`
+      <p>Please run <code>rm -rf node_modules &amp;&amp; npm install</code> before starting.</p>
+      <li>Set <code>DEBUG=1</code> to enable verbose logging for this session.</li>
+    `);
+    const texts = detectTextBlocks(document.body).map((b) => b.text);
+
+    // 문단 자체는 번역 대상으로 잡혀야 한다
+    expect(texts.some((t) => t.includes('before starting'))).toBe(true);
+
+    // 그런데 쉘 명령과 환경변수는 번역기에 넘어가면 안 된다.
+    // 넘어가면 사용자가 복사해 실행할 명령어가 번역돼 망가진다.
+    expect(texts.some((t) => t.includes('rm -rf'))).toBe(false);
+    expect(texts.some((t) => t.includes('node_modules'))).toBe(false);
+    expect(texts.some((t) => t.includes('DEBUG=1'))).toBe(false);
+  });
 });
 
 describe('Non-English text skipped', () => {

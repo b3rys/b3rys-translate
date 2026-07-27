@@ -4,6 +4,8 @@
  */
 
 export interface SiteRule {
+  /** Apply this hostname rule only when the current path matches. */
+  pathPattern?: RegExp;
   /** Inject translation as sibling for inline elements (default: false) */
   injectAsSibling?: boolean;
   /** Override main content selector for viewport priority */
@@ -16,6 +18,15 @@ export interface SiteRule {
   translateSelectors?: string[];
   /** Replace element content entirely with translation (used with translateSelectors) */
   forceReplace?: boolean;
+  /**
+   * Split a matched element into per-paragraph units before translating, using
+   * blank lines as the boundary. Some sites (antirez) put an entire article in
+   * ONE `<pre>`; without this the whole thing is a single block and the reader
+   * gets a wall of Korean *after* a wall of English. Paragraph-by-paragraph is
+   * the product default, so any rule whose selector matches a multi-paragraph
+   * container should set this.
+   */
+  splitParagraphs?: boolean;
   /**
    * After a translation pass, nudge the scroll container by 1px to force a
    * repaint. For virtualized / `content-visibility` lists (Substack chat) the
@@ -54,6 +65,23 @@ const SITE_RULES: Record<string, SiteRule> = {
     onlyWithin: ['[role="main"]'],
     mainContentSelector: '[role="main"]',
   },
+  'antirez.com': {
+    // antirez renders article prose inside a single <pre>. PRE stays globally
+    // skipped for code safety; this opts in the one structure the site uses for
+    // articles — /news/<n> (one article) and /latest/<n> (the index, which
+    // carries excerpts in the same markup).
+    //
+    // The `:not(:has(code))` guard below is kept for consistency with the other
+    // rules but does nothing here: this site never emits a <code> tag. Code
+    // safety comes from splitParagraphs, which skips indented code paragraphs
+    // individually instead of giving up on the whole article.
+    pathPattern: /^\/(news|latest)\/\d+\/?$/,
+    translateSelectors: [
+      '#newslist article[data-news-id] h2',
+      'topcomment article.comment > pre:not(:has(code))',
+    ],
+    splitParagraphs: true,
+  },
   'skilljar.com': {
     injectAsSibling: true,
     skipSelectors: ['.clp__enroll-btn', 'header'],
@@ -66,15 +94,19 @@ const SITE_RULES: Record<string, SiteRule> = {
  */
 export function getSiteRule(): SiteRule | null {
   const host = location.hostname;
+  const path = location.pathname;
+
+  const applicable = (rule: SiteRule | undefined): rule is SiteRule =>
+    !!rule && (!rule.pathPattern || rule.pathPattern.test(path));
 
   // Exact match
-  if (SITE_RULES[host]) return SITE_RULES[host];
+  if (applicable(SITE_RULES[host])) return SITE_RULES[host];
 
   // Parent domain match (e.g. foo.substack.com → substack.com)
   const parts = host.split('.');
   for (let i = 1; i < parts.length - 1; i++) {
     const parent = parts.slice(i).join('.');
-    if (SITE_RULES[parent]) return SITE_RULES[parent];
+    if (applicable(SITE_RULES[parent])) return SITE_RULES[parent];
   }
 
   return null;

@@ -72,6 +72,14 @@
 - [x] **SPA 전환 후 stale player response 차단** — `ytInitialPlayerResponse`·초기 페이지 script 태그가 전환 후에도 이전 영상을 가리킴(실측 확인). 3개 전략 전부 videoId 검증 (4 tests)
 - [x] **자막 종류(kind)·locale 매칭 정밀화 + 잔여 누수 정리** — 실제 받은 payload로 ASR/manual 판정(조각 자막 방지) · `lang` 정확 일치 우선(zh-Hant↔zh-Hans 오매칭 차단) · `v=` 없는 URL 오태깅 금지 · 언어 변경 시 videoId 재검증(떠난 영상 재번역 방지) · rolling translation 리스너 누수 · notice 잔존 · CC 토글 타이머 미취소 · 스킬 문서에 #16 규칙 기록 (하네스 3인 검수 반영)
 - [x] **`pot` 토큰 게이팅으로 자막을 못 받던 버그** — YouTube가 timedtext에 영상별 proof-of-origin 토큰을 요구(baseUrl 직접 요청 시 200 + 0바이트). 공식 한국어 자막이 있는 영상은 YouTube가 ko만 로드해 en 인터셉트가 없어 이중자막이 아예 안 나옴. 인터셉트한 URL의 토큰을 빌려 `lang`/`kind`만 교체해 재요청(토큰은 영상별, 실측 검증) · bridge를 live `getPlayerResponse()` 우선으로 (HTML fetch 폴백 제거) (3 tests)
+- [x] **번역 모델 정리** — 씽킹 모델(Gemini 3.5 Flash Lite: 씽킹 상시 ON, 끌 수 없음) 제외 · Sonnet 4.6 비용 과다로 제외 → 번역 최적화 4개 모델. 저장된 옛 선택값은 기본값으로 복구 (migration)
+- [x] **문단 단위 번역** — 글 전체가 <pre> 하나인 사이트에서 영문 전체 뒤 국문 전체가 붙던 문제. site rule `splitParagraphs` 로 빈 줄 경계마다 inline span wrapper 를 씌워 문단별로 번역 (v0.5.11)
+- [x] **antirez 규칙 확대 + 코드 문단 스킵** — /news/169 → /news/<n> · /latest/<n>. 이 사이트는 <code> 태그를 안 쓰고 들여쓰기로만 코드를 넣어 기존 `:has(code)` 가드가 무력했다. 들여쓰기 신호로 코드 문단만 건너뛴다 (글 12편 검증) (v0.5.12)
+- [x] **팝업 버전 하드코딩 제거** — HTML 에 숫자가 박혀 있어 새 빌드를 올리고도 옛 버전으로 표시, 실제로 어느 빌드가 도는지 오판했다. 매니페스트에서 읽는다
+- [x] **비용 표 중복 줄** — 사용량 집계 키가 엔진 → 모델로 바뀌며 두 형식이 공존, 같은 이름이 두 줄로 표시. 옛 엔진 버킷을 migration 에서 제거
+- [ ] **깃헙 싱크** — 로컬 커밋 밀림. PR 을 gd452 로 올리면 작성자=승인자가 되어 gd.b3rys 계정 필요 (대표님 브라우저 로그인 필요)
+- [ ] **크롬 웹스토어 재배포** — 대표님 인수테스트 후 승인 대기
+- [ ] **인수테스트 미커버 항목** — 유튜브 이중자막 · 드래그 선택 번역 · Gmail · Substack
 
 > 범례: `[x]` 완료 · `[~]` 진행중 · `[ ]` 미착수
 
@@ -90,7 +98,7 @@
 
 ### 테스트 현황
 
-> 현재: **252개 tests** (unit + acceptance). `npm run test`로 실행.
+> 현재: **340개 tests** (unit + acceptance). `npm run test`로 실행.
 
 주요 커버리지 — 텍스트 감지 · 번역 주입 · Observer 필터 · Circuit Breaker · 상태 머신 ·
 사이트별 룰 · 선택 번역 팝업 · 번역 캐시 · YouTube cue 병합/자막/타이밍 · LLM 헬퍼.

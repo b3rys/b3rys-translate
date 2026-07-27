@@ -1063,6 +1063,15 @@ function injectBlock(
     span.className = 'b3rys-translation';
   }
 
+  // PRE remains globally excluded by the detector. If a site rule explicitly
+  // opts a prose PRE into translation (antirez), preserve its paragraph breaks
+  // without changing detection or injection behavior for ordinary code blocks.
+  if (element.tagName === 'PRE') {
+    span.className = 'b3rys-translation';
+    span.style.whiteSpace = 'pre-wrap';
+    span.style.display = 'block';
+  }
+
   if (truncated) applyTruncationStyles(span);
 
   // Flex/grid container: find the deepest text element and inject there.
@@ -1114,6 +1123,7 @@ function injectBlock(
   // Skip inside <nav> — nav items should stay inline
   const insideNav = !!element.closest('nav');
   if (
+    element.tagName !== 'PRE' &&
     !insideNav &&
     !truncated &&
     (elStyle.whiteSpace === 'nowrap' || elStyle.whiteSpace === 'pre')

@@ -1,3 +1,6 @@
+import type { ModelId } from '../models';
+import type { TranslationRequestMode } from '../translation-types';
+
 export type EngineType = 'gemini' | 'openai' | 'anthropic';
 
 export interface UsageData {
@@ -14,9 +17,10 @@ export interface TranslationEngine {
   translate(
     apiKey: string,
     paragraphs: { id: string; text: string }[],
-    mode: 'page' | 'subtitle' | 'word' | 'segment',
+    mode: TranslationRequestMode,
     subtitleContext?: { original: string; translated: string }[],
     lang?: { sourceLang?: string; targetLang?: string },
+    modelId?: ModelId,
   ): Promise<TranslateResult>;
 }
 
