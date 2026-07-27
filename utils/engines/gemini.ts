@@ -39,6 +39,17 @@ async function callGeminiAPI(
       body: JSON.stringify({
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         generationConfig: {
+          // 번역은 창작이 아니다. 같은 문단은 같게 나와야 하고, 응답이 JSON 이라
+          // 형식이 흔들리면 파싱이 깨진다. 그래서 낮게 고정한다.
+          //
+          // 모델 선택 기능을 넣으면서 이 줄이 사라졌었다. 카탈로그의 Gemini 는
+          // 3.1 하나뿐이고 이 모델은 temperature 를 정상 지원하므로 뺄 이유가
+          // 없었다 — temperature 를 무시하는 것은 3.5-flash-lite 부터다.
+          // (근거: _workspace/model-research/google.md)
+          //
+          // temperature 를 지원하지 않는 모델을 카탈로그에 추가할 때는 여기서
+          // 모델별로 분기할 것. 지금은 분기가 필요 없다.
+          temperature: 0.1,
           maxOutputTokens: 8192,
         },
       }),
