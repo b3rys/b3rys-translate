@@ -12,7 +12,6 @@ describe('popup model UI', () => {
 
     expect(Array.from(select.options).map((option) => option.textContent)).toEqual([
       'Gemini 3.1 Flash Lite',
-      'Gemini 3.5 Flash Lite',
       'GPT-5.4 Nano',
       'GPT-5.6 Luna',
       'Claude Haiku 4.5',

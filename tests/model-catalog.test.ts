@@ -9,20 +9,20 @@ import {
 } from '@/utils/models';
 
 describe('model catalog', () => {
-  it('exposes exactly two label-only model choices per provider', () => {
+  it('exposes only label-only, non-thinking model choices per provider', () => {
     expect(getModelsForEngine('openai').map((model) => model.label)).toEqual([
       'GPT-5.4 Nano',
       'GPT-5.6 Luna',
     ]);
     expect(getModelsForEngine('gemini').map((model) => model.label)).toEqual([
       'Gemini 3.1 Flash Lite',
-      'Gemini 3.5 Flash Lite',
     ]);
     expect(getModelsForEngine('anthropic').map((model) => model.label)).toEqual([
       'Claude Haiku 4.5',
       'Claude Sonnet 4.6',
     ]);
-    expect(MODEL_CATALOG).toHaveLength(6);
+    // 5개다. Gemini 3.5 Flash Lite 는 씽킹을 끌 수 없어 제외했다(utils/models.ts 주석).
+    expect(MODEL_CATALOG).toHaveLength(5);
   });
 
   it('migrates users without a saved model to each provider economy model', () => {
@@ -44,9 +44,9 @@ describe('model catalog', () => {
   it('keeps official per-model prices in the same source of truth', () => {
     expect(getModelConfig('gpt-5.4-nano').pricing).toEqual({ input: 0.2, output: 1.25 });
     expect(getModelConfig('gpt-5.6-luna').pricing).toEqual({ input: 1, output: 6 });
-    expect(getModelConfig('gemini-3.5-flash-lite').pricing).toEqual({
-      input: 0.3,
-      output: 2.5,
+    expect(getModelConfig('gemini-3.1-flash-lite').pricing).toEqual({
+      input: 0.25,
+      output: 1.5,
     });
     expect(getModelConfig('claude-sonnet-4-6').pricing).toEqual({ input: 3, output: 15 });
   });

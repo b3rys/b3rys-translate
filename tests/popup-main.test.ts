@@ -43,7 +43,7 @@ describe('popup model wiring', () => {
     const badge = document.querySelector('.badge-model') as HTMLElement;
 
     await vi.waitFor(() => {
-      expect(select.options).toHaveLength(6);
+      expect(select.options).toHaveLength(5);
       expect(select.value).toBe('gpt-5.6-luna');
       expect(apiKey.value).toBe('••••••••1234');
       expect(badge.textContent).toBe('GPT-5.6 Luna');

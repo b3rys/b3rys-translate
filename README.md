@@ -132,7 +132,6 @@ Chrome 툴바에서 확장 프로그램 아이콘 클릭 → 팝업에서 모델
 | 모델                      | 키 발급 위치                                                     | 가격 (USD / 1M tokens, input/output) |
 | ------------------------- | ---------------------------------------------------------------- | ------------------------------------ |
 | **Gemini 3.1 Flash Lite** | [Google AI Studio](https://aistudio.google.com/apikey)           | $0.25 / $1.50                        |
-| **Gemini 3.5 Flash Lite** | [Google AI Studio](https://aistudio.google.com/apikey)           | $0.30 / $2.50                        |
 | **GPT-5.4 Nano**          | [OpenAI Platform](https://platform.openai.com/api-keys)          | $0.20 / $1.25                        |
 | **GPT-5.6 Luna**          | [OpenAI Platform](https://platform.openai.com/api-keys)          | $1.00 / $6.00                        |
 | **Claude Haiku 4.5**      | [Anthropic Console](https://console.anthropic.com/settings/keys) | $1.00 / $5.00                        |

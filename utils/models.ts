@@ -1,8 +1,19 @@
 import type { EngineType } from './engines/types';
 
+/**
+ * 씽킹(추론) 모델은 넣지 않는다 — 팀 결정 2026-07-27.
+ *
+ * 번역은 추론이 필요한 작업이 아니라 지연과 토큰만 늘린다. 그래서 후보는
+ * "씽킹을 하지 않거나 요청에서 확실히 끌 수 있는" 모델로 제한한다.
+ *
+ * 제외된 예: gemini-3.5-flash-lite 는 씽킹이 기본 on(minimal)이고 레벨에
+ * off 가 없어 끌 방법이 없다. thinkingConfig 를 생략하는 것은 비활성화가
+ * 아니라 기본값으로 도는 것이다.
+ *
+ * 모델을 추가할 때는 씽킹을 끌 수 있는지 공급사 문서로 먼저 확인할 것.
+ */
 export type ModelId =
   | 'gemini-3.1-flash-lite'
-  | 'gemini-3.5-flash-lite'
   | 'gpt-5.4-nano'
   | 'gpt-5.6-luna'
   | 'claude-haiku-4-5-20251001'
@@ -26,12 +37,6 @@ export const MODEL_CATALOG: readonly ModelConfig[] = [
     engine: 'gemini',
     label: 'Gemini 3.1 Flash Lite',
     pricing: { input: 0.25, output: 1.5 },
-  },
-  {
-    id: 'gemini-3.5-flash-lite',
-    engine: 'gemini',
-    label: 'Gemini 3.5 Flash Lite',
-    pricing: { input: 0.3, output: 2.5 },
   },
   {
     id: 'gpt-5.4-nano',

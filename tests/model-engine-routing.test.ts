@@ -40,7 +40,7 @@ describe('model-aware engine requests', () => {
     expect(body).not.toHaveProperty('temperature');
   });
 
-  it('routes Gemini 3.5 Flash Lite through its model endpoint without deprecated temperature', async () => {
+  it('routes Gemini 3.1 Flash Lite through its model endpoint without deprecated temperature', async () => {
     const fetchMock = vi.fn(
       async (_input: RequestInfo | URL, _init?: RequestInit) =>
         new Response(
@@ -61,11 +61,11 @@ describe('model-aware engine requests', () => {
       'page',
       undefined,
       { sourceLang: 'en', targetLang: 'ko' },
-      'gemini-3.5-flash-lite',
+      'gemini-3.1-flash-lite',
     );
 
     const [url, init] = fetchMock.mock.calls[0];
-    expect(String(url)).toContain('/models/gemini-3.5-flash-lite:generateContent');
+    expect(String(url)).toContain('/models/gemini-3.1-flash-lite:generateContent');
     const body = JSON.parse((init as RequestInit).body as string);
     expect(body.generationConfig).not.toHaveProperty('temperature');
   });
