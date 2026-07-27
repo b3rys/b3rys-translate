@@ -103,7 +103,6 @@ manifest.json이 있는 그 폴더 경로를 사용자에게 명확히 알려준
 | GPT-5.4 Nano          | https://platform.openai.com/api-keys        | $0.20 / $1.25                        |
 | GPT-5.6 Luna          | https://platform.openai.com/api-keys        | $1.00 / $6.00                        |
 | Claude Haiku 4.5      | https://console.anthropic.com/settings/keys | $1.00 / $5.00                        |
-| Claude Sonnet 4.6     | https://console.anthropic.com/settings/keys | $3.00 / $15.00                       |
 
 안내 순서:
 

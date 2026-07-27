@@ -19,10 +19,9 @@ describe('model catalog', () => {
     ]);
     expect(getModelsForEngine('anthropic').map((model) => model.label)).toEqual([
       'Claude Haiku 4.5',
-      'Claude Sonnet 4.6',
     ]);
     // 5개다. Gemini 3.5 Flash Lite 는 씽킹을 끌 수 없어 제외했다(utils/models.ts 주석).
-    expect(MODEL_CATALOG).toHaveLength(5);
+    expect(MODEL_CATALOG).toHaveLength(4);
   });
 
   it('migrates users without a saved model to each provider economy model', () => {
@@ -37,7 +36,7 @@ describe('model catalog', () => {
   });
 
   it('rejects a model saved under the wrong provider and falls back safely', () => {
-    expect(resolveSelectedModel('openai', 'claude-sonnet-4-6')).toBe('gpt-5.4-nano');
+    expect(resolveSelectedModel('openai', 'claude-haiku-4-5-20251001')).toBe('gpt-5.4-nano');
     expect(getModelConfig('gpt-5.6-luna').engine).toBe('openai');
   });
 
@@ -48,7 +47,6 @@ describe('model catalog', () => {
       input: 0.25,
       output: 1.5,
     });
-    expect(getModelConfig('claude-sonnet-4-6').pricing).toEqual({ input: 3, output: 15 });
   });
 
   it('calculates usage with the selected model price', () => {

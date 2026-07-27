@@ -32,8 +32,8 @@ describe('model selection migration', () => {
         selectedEngine: 'anthropic',
         selectedModels: {
           gemini: 'gemini-3.5-flash-lite',
-          openai: 'claude-sonnet-4-6',
-          anthropic: 'claude-sonnet-4-6',
+          openai: 'claude-haiku-4-5-20251001',
+          anthropic: 'claude-haiku-4-5-20251001',
         },
         engineApiKeys: { anthropic: 'existing-key' },
       },
@@ -44,7 +44,7 @@ describe('model selection migration', () => {
     expect(mock.local._data.get(SELECTED_MODELS_KEY)).toEqual({
       gemini: DEFAULT_MODEL_IDS.gemini, // 제거된 모델 → 기본값으로 복구
       openai: DEFAULT_MODEL_IDS.openai, // 다른 제공사 모델 → 기본값으로 복구
-      anthropic: 'claude-sonnet-4-6', // 유효한 선택 → 보존
+      anthropic: DEFAULT_MODEL_IDS.anthropic, // 유효한 선택 → 보존
     });
     expect(mock.local._data.get('selectedEngine')).toBe('anthropic');
     expect(mock.local._data.get('engineApiKeys')).toEqual({ anthropic: 'existing-key' });

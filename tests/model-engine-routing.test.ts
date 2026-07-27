@@ -72,7 +72,7 @@ describe('model-aware engine requests', () => {
     expect(body.generationConfig.temperature).toBe(0.1);
   });
 
-  it('routes Claude Sonnet 4.6 through the existing Messages API contract', async () => {
+  it('routes Claude Haiku 4.5 through the existing Messages API contract', async () => {
     const fetchMock = vi.fn(
       async (_input: RequestInfo | URL, _init?: RequestInit) =>
         new Response(
@@ -91,11 +91,11 @@ describe('model-aware engine requests', () => {
       'page',
       undefined,
       { sourceLang: 'en', targetLang: 'ko' },
-      'claude-sonnet-4-6',
+      'claude-haiku-4-5-20251001',
     );
 
     const init = fetchMock.mock.calls[0][1] as RequestInit;
     const body = JSON.parse(init.body as string);
-    expect(body.model).toBe('claude-sonnet-4-6');
+    expect(body.model).toBe('claude-haiku-4-5-20251001');
   });
 });

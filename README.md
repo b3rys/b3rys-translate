@@ -135,7 +135,6 @@ Chrome 툴바에서 확장 프로그램 아이콘 클릭 → 팝업에서 모델
 | **GPT-5.4 Nano**          | [OpenAI Platform](https://platform.openai.com/api-keys)          | $0.20 / $1.25                        |
 | **GPT-5.6 Luna**          | [OpenAI Platform](https://platform.openai.com/api-keys)          | $1.00 / $6.00                        |
 | **Claude Haiku 4.5**      | [Anthropic Console](https://console.anthropic.com/settings/keys) | $1.00 / $5.00                        |
-| **Claude Sonnet 4.6**     | [Anthropic Console](https://console.anthropic.com/settings/keys) | $3.00 / $15.00                       |
 
 API 키는 제공사별로 독립 저장되므로 같은 제공사의 모델은 하나의 키를 공유합니다.
 API 키는 브라우저의 `chrome.storage.local`에만 저장되며 외부로 동기화되지 않습니다 (번역 요청은 사용자가 선택한 제공사 API로 직접 전송).

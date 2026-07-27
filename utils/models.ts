@@ -11,13 +11,15 @@ import type { EngineType } from './engines/types';
  * 아니라 기본값으로 도는 것이다.
  *
  * 모델을 추가할 때는 씽킹을 끌 수 있는지 공급사 문서로 먼저 확인할 것.
+ *
+ * 비용도 기준이다 — claude-sonnet-4-6 은 Haiku 대비 3배($3/$15 vs $1/$5)라
+ * 번역 품질 차이가 그 값을 정당화하지 못한다고 보고 뺐다(팀 결정 2026-07-27).
  */
 export type ModelId =
   | 'gemini-3.1-flash-lite'
   | 'gpt-5.4-nano'
   | 'gpt-5.6-luna'
-  | 'claude-haiku-4-5-20251001'
-  | 'claude-sonnet-4-6';
+  | 'claude-haiku-4-5-20251001';
 
 export interface ModelConfig {
   id: ModelId;
@@ -55,12 +57,6 @@ export const MODEL_CATALOG: readonly ModelConfig[] = [
     engine: 'anthropic',
     label: 'Claude Haiku 4.5',
     pricing: { input: 1, output: 5 },
-  },
-  {
-    id: 'claude-sonnet-4-6',
-    engine: 'anthropic',
-    label: 'Claude Sonnet 4.6',
-    pricing: { input: 3, output: 15 },
   },
 ] as const;
 

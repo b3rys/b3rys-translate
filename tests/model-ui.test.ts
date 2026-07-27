@@ -15,7 +15,6 @@ describe('popup model UI', () => {
       'GPT-5.4 Nano',
       'GPT-5.6 Luna',
       'Claude Haiku 4.5',
-      'Claude Sonnet 4.6',
     ]);
   });
 
