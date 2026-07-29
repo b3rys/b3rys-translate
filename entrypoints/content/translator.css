@@ -1,11 +1,26 @@
+/* 원문 바로 아래 번역이 붙는 화면에서 "어디까지가 원문인지"를 매번 읽어서
+   판단하지 않아도 되게 만드는 것이 여기 규칙들의 목적이다.
+
+   ① 간격이 색보다 먼저다. 예전에는 원문↔번역 0.6em, 번역↔다음 문단 0.8em 으로
+      거의 같아서 한 쌍으로 묶이지 않고 문단이 그냥 나열돼 보였다. 위를 좁히고
+      아래를 넓혀 원문+번역이 한 덩어리가 되게 한다.
+   ② 색은 opacity 가 아니라 글자색으로 죽인다. opacity 는 자식까지 흐려져
+      번역문 안의 링크가 같이 사라진다. currentColor 를 섞으면 밝은 배경이든
+      어두운 배경이든 알아서 맞는다.
+   ③ 한글은 같은 크기에서 로마자보다 크게 보인다. 0.95배로 시각적 균형을 맞춘다.
+
+   replace 모드는 원문을 감추고 번역만 남기는 모드다. 그때 번역문은 원문을
+   대신하는 본문이므로 흐리게 하거나 줄이면 안 된다 — 아래에서 되돌린다. */
 .b3rys-translation {
   display: block;
-  color: inherit;
+  color: inherit; /* color-mix 를 모르는 구형 브라우저 폴백 */
+  color: color-mix(in srgb, currentColor 82%, transparent);
   font-family: inherit;
   font-weight: inherit;
   line-height: inherit;
-  margin-top: 0.6em;
-  margin-bottom: 0.8em;
+  font-size: 0.95em;
+  margin-top: 0.15em;
+  margin-bottom: 1.2em;
   padding: 0;
   border: none;
   background: none;
@@ -15,8 +30,10 @@
 
 .b3rys-translation-inline {
   color: inherit;
+  color: color-mix(in srgb, currentColor 82%, transparent);
   font-family: inherit;
   font-weight: inherit;
+  font-size: 0.95em;
   margin-left: 0.5em;
   opacity: 1;
   transition: opacity 0.3s ease;
@@ -70,7 +87,13 @@ body.b3rys-replace-mode [data-b3rys-original] {
 body.b3rys-replace-mode .b3rys-translation {
   margin-top: 0;
   margin-bottom: 0;
+  /* 원문이 사라진 자리라 번역이 곧 본문이다. 흐리게·작게 두면 페이지 전체가
+     빛바래 보인다. 대조용 스타일을 여기서 되돌린다. */
+  color: inherit;
+  font-size: inherit;
 }
 body.b3rys-replace-mode .b3rys-translation-inline {
   margin-left: 0;
+  color: inherit;
+  font-size: inherit;
 }
