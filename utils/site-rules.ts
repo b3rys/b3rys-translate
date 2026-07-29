@@ -82,6 +82,12 @@ const SITE_RULES: Record<string, SiteRule> = {
     ],
     splitParagraphs: true,
   },
+  'x.com': {
+    splitParagraphs: true,
+  },
+  'twitter.com': {
+    splitParagraphs: true,
+  },
   'skilljar.com': {
     injectAsSibling: true,
     skipSelectors: ['.clp__enroll-btn', 'header'],
