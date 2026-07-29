@@ -40,9 +40,12 @@ export function detectTextBlocks(root: Element = document.body): TextBlock[] {
     if (containers.length > 0) {
       const allBlocks: TextBlock[] = [];
       for (const container of containers) {
-        const blocks = detectStandardBlocks(container as Element);
+        const blocks = detectStandardBlocks(container as Element, rule.splitParagraphs === true);
         const filtered = filterAncestorBlocks(blocks);
-        const leafBlocks = detectLeafTextBlocks(container as Element);
+        const leafBlocks = detectLeafTextBlocks(
+          container as Element,
+          rule.splitParagraphs === true,
+        );
         allBlocks.push(...filtered, ...leafBlocks);
       }
       return allBlocks;
@@ -51,11 +54,12 @@ export function detectTextBlocks(root: Element = document.body): TextBlock[] {
   }
 
   // Phase 1: Semantic block tags (P, H1-H6, LI, TD, BLOCKQUOTE, etc.)
-  const blocks = detectStandardBlocks(root);
+  const splitParagraphs = rule?.splitParagraphs === true;
+  const blocks = detectStandardBlocks(root, splitParagraphs);
   const filtered = filterAncestorBlocks(blocks);
 
   // Phase 2: Text containers missed by Phase 1 (nav menus, sidebars, bios)
-  const leafBlocks = detectLeafTextBlocks(root);
+  const leafBlocks = detectLeafTextBlocks(root, splitParagraphs);
 
   return [...filtered, ...leafBlocks];
 }
@@ -152,11 +156,21 @@ function looksLikeCodeBlock(text: string): boolean {
  * (fewer than two paragraphs) — the caller then treats the element as one block.
  */
 function paragraphUnits(el: HTMLElement): HTMLElement[] {
-  if (el.hasAttribute(PARA_SPLIT_ATTR)) {
-    return [...el.querySelectorAll<HTMLElement>(`[${PARA_ATTR}]`)];
+  let splitEl = el;
+  const hasDirectText = [...el.childNodes].some(
+    (node) => node.nodeType === Node.TEXT_NODE && !!(node.textContent ?? '').trim(),
+  );
+  if (!hasDirectText && el.children.length === 1) {
+    splitEl = el.children[0] as HTMLElement;
+  }
+
+  if (splitEl.hasAttribute(PARA_SPLIT_ATTR)) {
+    return [...splitEl.querySelectorAll<HTMLElement>(`[${PARA_ATTR}]`)];
   }
   // Decide BEFORE mutating: the split moves nodes, so it can't be undone cheaply.
-  const paragraphCount = (el.textContent ?? '').split(PARA_BREAK).filter((s) => s.trim()).length;
+  const paragraphCount = (splitEl.textContent ?? '')
+    .split(PARA_BREAK)
+    .filter((s) => s.trim()).length;
   if (paragraphCount < 2) return [];
 
   const rebuilt: Node[] = [];
@@ -185,7 +199,7 @@ function paragraphUnits(el: HTMLElement): HTMLElement[] {
     current = [];
   };
 
-  for (const node of [...el.childNodes]) {
+  for (const node of [...splitEl.childNodes]) {
     // Blank lines inside a nested element (e.g. <b>) are not boundaries; only a
     // top-level text node splits, which keeps inline markup intact.
     if (node.nodeType !== Node.TEXT_NODE || !PARA_BREAK.test(node.textContent ?? '')) {
@@ -210,14 +224,14 @@ function paragraphUnits(el: HTMLElement): HTMLElement[] {
   if (wrappers.length < 2) {
     // The blank lines sat somewhere that didn't yield separate units after all.
     // Put the original children back so the caller sees an untouched element.
-    el.replaceChildren(
+    splitEl.replaceChildren(
       ...rebuilt.flatMap((n) => (wrappers.includes(n as HTMLElement) ? [...n.childNodes] : [n])),
     );
     return [];
   }
 
-  el.setAttribute(PARA_SPLIT_ATTR, 'true');
-  el.replaceChildren(...rebuilt);
+  splitEl.setAttribute(PARA_SPLIT_ATTR, 'true');
+  splitEl.replaceChildren(...rebuilt);
   return wrappers;
 }
 
@@ -337,7 +351,7 @@ function isShortNavLabel(el: HTMLElement, text: string): boolean {
 // Text extraction: getDirectText/getDirectHTML — excludes nested block children,
 //   includes inline markup (a, code, strong, em, etc.)
 
-function detectStandardBlocks(root: Element): TextBlock[] {
+function detectStandardBlocks(root: Element, splitParagraphs = false): TextBlock[] {
   const blocks: TextBlock[] = [];
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, {
     acceptNode(node) {
@@ -353,6 +367,24 @@ function detectStandardBlocks(root: Element): TextBlock[] {
   let node: Node | null;
   while ((node = walker.nextNode())) {
     const el = node as HTMLElement;
+    if (splitParagraphs) {
+      const paragraphs = paragraphUnits(el);
+      if (paragraphs.length) {
+        for (const paragraph of paragraphs) {
+          if (
+            paragraph.hasAttribute(DATA_ATTRS.TRANSLATED) ||
+            paragraph.hasAttribute(DATA_ATTRS.BLOCK_ID)
+          )
+            continue;
+          const text = getDirectText(paragraph).trim();
+          if (shouldSkipText(paragraph, text, 1)) continue;
+          const id = `b3rys-${++blockCounter}`;
+          paragraph.setAttribute(DATA_ATTRS.BLOCK_ID, id);
+          blocks.push({ id, element: paragraph, text, html: getDirectHTML(paragraph).trim() });
+        }
+        continue;
+      }
+    }
     const text = getDirectText(el).trim();
     if (shouldSkipText(el, text, 1)) continue;
 
@@ -463,7 +495,7 @@ function hasWhitespaceBetween(parent: HTMLElement, a: Element, b: Element): bool
   return false;
 }
 
-function detectLeafTextBlocks(root: Element): TextBlock[] {
+function detectLeafTextBlocks(root: Element, splitParagraphs = false): TextBlock[] {
   const blocks: TextBlock[] = [];
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, {
     acceptNode(node) {
@@ -498,6 +530,24 @@ function detectLeafTextBlocks(root: Element): TextBlock[] {
     const el = node as HTMLElement;
     // Skip if ancestor already detected in this Phase 2 run (parent covers this text)
     if (el.parentElement?.closest(`[${DATA_ATTRS.BLOCK_ID}]`)) continue;
+    if (splitParagraphs) {
+      const paragraphs = paragraphUnits(el);
+      if (paragraphs.length) {
+        for (const paragraph of paragraphs) {
+          if (
+            paragraph.hasAttribute(DATA_ATTRS.TRANSLATED) ||
+            paragraph.hasAttribute(DATA_ATTRS.BLOCK_ID)
+          )
+            continue;
+          const text = paragraph.textContent?.trim().replace(/\s+/g, ' ') ?? '';
+          if (shouldSkipText(paragraph, text, 2)) continue;
+          const id = `b3rys-${++blockCounter}`;
+          paragraph.setAttribute(DATA_ATTRS.BLOCK_ID, id);
+          blocks.push({ id, element: paragraph, text, html: text });
+        }
+        continue;
+      }
+    }
     const text = el.textContent?.trim().replace(/\s+/g, ' ') ?? '';
     if (shouldSkipText(el, text, 2)) continue;
 
