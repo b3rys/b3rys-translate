@@ -24,6 +24,7 @@ const ENGINE_KEY_URLS: Record<EngineType, string> = {
   gemini: 'https://aistudio.google.com/apikey',
   openai: 'https://platform.openai.com/api-keys',
   anthropic: 'https://console.anthropic.com/settings/keys',
+  upstage: 'https://console.upstage.ai/api-keys',
 };
 
 interface EngineUsageStats {

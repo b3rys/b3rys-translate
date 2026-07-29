@@ -19,7 +19,8 @@ export type ModelId =
   | 'gemini-3.1-flash-lite'
   | 'gpt-5.4-nano'
   | 'gpt-5.6-luna'
-  | 'claude-haiku-4-5-20251001';
+  | 'claude-haiku-4-5-20251001'
+  | 'solar-mini';
 
 export interface ModelConfig {
   id: ModelId;
@@ -58,12 +59,28 @@ export const MODEL_CATALOG: readonly ModelConfig[] = [
     label: 'Claude Haiku 4.5',
     pricing: { input: 1, output: 5 },
   },
+  {
+    // Upstage 문서 확인(2026-07-29): `solar-mini` 는 별칭이고 실제로는
+    // solar-mini-250422 를 가리킨다. ★reasoning 을 지원하지 않는다★ —
+    // reasoning_effort 파라미터 자체가 무시된다. 위의 씽킹 배제 기준을
+    // 공급사 문서로 확인한 유일한 모델이다.
+    //
+    // 가격은 Upstage 공개 요금표의 chat 모델 단가($0.15/$0.60)를 쓴다.
+    // 외부 PR(#14)은 $0.05/$0.20 이라고 적어 왔지만 어느 출처에서도 그 숫자를
+    // 확인하지 못했다. 비용은 어차피 추정치이고, 틀린다면 ★과대 추정★ 쪽이
+    // 안전하다 — 실제보다 싸게 보여주면 사용자가 모르는 새 더 쓴다.
+    id: 'solar-mini',
+    engine: 'upstage',
+    label: 'Upstage Solar Mini',
+    pricing: { input: 0.15, output: 0.6 },
+  },
 ] as const;
 
 export const DEFAULT_MODEL_IDS: Record<EngineType, ModelId> = {
   gemini: 'gemini-3.1-flash-lite',
   openai: 'gpt-5.4-nano',
   anthropic: 'claude-haiku-4-5-20251001',
+  upstage: 'solar-mini',
 };
 
 const modelsById = new Map(MODEL_CATALOG.map((model) => [model.id, model]));
@@ -98,5 +115,6 @@ export function normalizeSelectedModels(
     gemini: resolveSelectedModel('gemini', savedModels?.gemini),
     openai: resolveSelectedModel('openai', savedModels?.openai),
     anthropic: resolveSelectedModel('anthropic', savedModels?.anthropic),
+    upstage: resolveSelectedModel('upstage', savedModels?.upstage),
   };
 }

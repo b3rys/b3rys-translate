@@ -6,7 +6,7 @@ describe('popup model UI', () => {
     document.body.innerHTML = '<select id="models"></select><div id="pricing"></div>';
   });
 
-  it('renders only the six model labels in the selector', () => {
+  it('renders exactly the catalog model labels in the selector', () => {
     const select = document.getElementById('models') as HTMLSelectElement;
     populateModelSelect(select);
 
@@ -15,6 +15,7 @@ describe('popup model UI', () => {
       'GPT-5.4 Nano',
       'GPT-5.6 Luna',
       'Claude Haiku 4.5',
+      'Upstage Solar Mini',
     ]);
   });
 
