@@ -45,6 +45,7 @@ describe('model selection migration', () => {
       gemini: DEFAULT_MODEL_IDS.gemini, // 제거된 모델 → 기본값으로 복구
       openai: DEFAULT_MODEL_IDS.openai, // 다른 제공사 모델 → 기본값으로 복구
       anthropic: DEFAULT_MODEL_IDS.anthropic, // 유효한 선택 → 보존
+      upstage: DEFAULT_MODEL_IDS.upstage, // 저장값 없음 → 기본값
     });
     expect(mock.local._data.get('selectedEngine')).toBe('anthropic');
     expect(mock.local._data.get('engineApiKeys')).toEqual({ anthropic: 'existing-key' });

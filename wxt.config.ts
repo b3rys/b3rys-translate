@@ -8,12 +8,13 @@ export default defineConfig({
     name: 'b3rys translate',
     description:
       'Bilingual translation — keep the original text and show the translation right below it, on any web page and YouTube subtitles.',
-    version: '0.5.12',
+    version: '0.5.13',
     permissions: ['storage', 'activeTab'],
     host_permissions: [
       'https://generativelanguage.googleapis.com/*',
       'https://api.openai.com/*',
       'https://api.anthropic.com/*',
+      'https://api.upstage.ai/*',
       'https://www.youtube.com/*',
       '<all_urls>',
     ],

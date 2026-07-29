@@ -3,11 +3,12 @@ export const ENGINE_ENDPOINTS = {
     'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent',
   openai: 'https://api.openai.com/v1/chat/completions',
   anthropic: 'https://api.anthropic.com/v1/messages',
+  upstage: 'https://api.upstage.ai/v1/chat/completions',
 } as const;
 
 /** Logged at content-script startup so the running bundle can be identified
  * in DevTools (stale bundles after a rebuild look identical otherwise). */
-export const BUILD_TAG = '0.5.12';
+export const BUILD_TAG = '0.5.13';
 
 export const BATCH_SIZE = 15;
 export const VIEWPORT_BATCH_SIZE = 5;
