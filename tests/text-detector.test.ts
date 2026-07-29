@@ -229,3 +229,58 @@ describe('URL text skipped', () => {
     expect(texts.some((t) => t.includes('github.com'))).toBe(false);
   });
 });
+
+// ============================================================
+// 상단 메뉴의 짧은 라벨
+// ============================================================
+
+describe('navigation labels', () => {
+  it('skips one-word menu labels inside a nav', () => {
+    // "Research" 밑에 "연구" 가 붙으면 메뉴가 두 배로 길어지고 훑어보기 어려워진다.
+    // anthropic.com 상단 메뉴에서 한 번에 네 개가 이렇게 됐다.
+    const container = setupDOM(`
+      <header><nav><ul>
+        <li><a href="/research">Research</a></li>
+        <li><a href="/policy">Policy</a></li>
+        <li><button>Commitments</button></li>
+      </ul></nav></header>
+    `);
+
+    const texts = detectTextBlocks(container).map((block) => block.text);
+
+    expect(texts).not.toContain('Research');
+    expect(texts).not.toContain('Policy');
+    expect(texts).not.toContain('Commitments');
+  });
+
+  it('still translates a full sentence that happens to sit in a header nav', () => {
+    // 헤더 메뉴라도 통째로 막지 않는다 — 긴 글은 라벨이 아니라 내용이다.
+    const sentence = 'Learn how to build production applications with our API';
+    const container = setupDOM(
+      `<header><nav><ul><li><a href="/docs">${sentence}</a></li></ul></nav></header>`,
+    );
+
+    const texts = detectTextBlocks(container).map((block) => block.text);
+
+    expect(texts.some((text) => text.includes('production applications'))).toBe(true);
+  });
+
+  it('keeps translating a sidebar nav — only the header menu is skipped', () => {
+    // GitHub 설정 사이드바가 이 경우다. nav 라는 이유만으로 막으면 이게 죽는다.
+    const container = setupDOM(
+      `<nav aria-label="Settings"><ul><li><a href="/s">Account</a></li></ul></nav>`,
+    );
+
+    expect(detectTextBlocks(container).map((b) => b.text)).toContain('Account');
+  });
+
+  it('leaves short text outside a nav alone', () => {
+    // 본문의 짧은 문구까지 건드리면 안 된다.
+    const container = setupDOM(`<article><p>Research</p><p>Policy</p></article>`);
+
+    const texts = detectTextBlocks(container).map((block) => block.text);
+
+    expect(texts).toContain('Research');
+    expect(texts).toContain('Policy');
+  });
+});

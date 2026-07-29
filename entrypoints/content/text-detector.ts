@@ -282,7 +282,52 @@ function shouldSkipText(el: HTMLElement, text: string, phase: 1 | 2): boolean {
   // [F5] Phase 2: container wrapping Phase 1 blocks (prevent duplicate)
   if (phase === 2 && el.querySelector(`[${DATA_ATTRS.BLOCK_ID}]`)) return true;
 
+  // [F6] Short labels in a navigation landmark
+  if (isShortNavLabel(el, text)) return true;
+
   return false;
+}
+
+/**
+ * Longest nav text we treat as a label rather than as content.
+ *
+ * Site menus are one or two words ("Research", "Commitments"). A `<nav>` that
+ * holds a real sentence — a docs table of contents entry, say — runs longer than
+ * this and still gets translated.
+ */
+const NAV_LABEL_MAX_CHARS = 24;
+
+/**
+ * A nav that is part of the site header — the top menu bar, not page content.
+ *
+ * `<nav>` alone is too broad to use as the test. GitHub's Settings sidebar is a
+ * `<nav>` full of short labels ("Account", "Appearance") that we translate on
+ * purpose, and tests pin that behaviour. The header is what separates them: the
+ * top menu is site chrome that repeats on every page, while a sidebar nav is
+ * part of the page you came to read.
+ */
+const HEADER_NAV_SELECTOR = [
+  'header nav',
+  'header [role="navigation"]',
+  '[role="banner"] nav',
+  '[role="banner"] [role="navigation"]',
+].join(',');
+
+/**
+ * Is this a short label in the site's top menu?
+ *
+ * Turning "Research" into "Research 연구" up there adds noise, not help: the
+ * reader learns a menu once, but the doubled label then sits on every page and
+ * makes the chrome hard to scan. anthropic.com showed four of these across its
+ * header at once.
+ *
+ * Scoped two ways so ordinary content is untouched — it must be in a header nav
+ * AND be short. The length test runs first because it is free; `closest()` walks
+ * ancestors, and most text on a page is not this short.
+ */
+function isShortNavLabel(el: HTMLElement, text: string): boolean {
+  if (text.length > NAV_LABEL_MAX_CHARS) return false;
+  return !!el.closest(HEADER_NAV_SELECTOR);
 }
 
 // ============================================================
