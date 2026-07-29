@@ -298,7 +298,10 @@ describe('Injection roundtrip', () => {
   });
 
   it('does not apply replace mode while translations are hidden', () => {
-    setupDOM('<p data-b3rys-original>Original text remains visible.</p>');
+    setupDOM(
+      '<p data-b3rys-original>Original text remains visible.</p>' +
+        '<p data-b3rys-translated>숨겨진 번역문입니다.</p>',
+    );
     document.body.classList.add('b3rys-hiding-translations');
 
     setTranslationModeWhenAvailable('replace');
