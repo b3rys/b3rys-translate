@@ -84,6 +84,10 @@ body.b3rys-hiding-translations [data-b3rys-translated] {
 body.b3rys-replace-mode [data-b3rys-original] {
   display: none;
 }
+/* Fail-safe: translations OFF + replace mode must never hide both sides. */
+body.b3rys-hiding-translations.b3rys-replace-mode [data-b3rys-original] {
+  display: revert;
+}
 body.b3rys-replace-mode .b3rys-translation {
   margin-top: 0;
   margin-bottom: 0;
