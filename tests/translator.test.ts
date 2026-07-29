@@ -7,6 +7,7 @@ import {
   purgeAllTranslations,
   cancelTranslation,
   setTranslationMode,
+  setTranslationModeWhenAvailable,
 } from '@/entrypoints/content/translator';
 import { recordInjection, isFighting, resetFightGuard } from '@/utils/fight-guard';
 import { DATA_ATTRS } from '@/utils/constants';
@@ -24,6 +25,7 @@ function setupDOM(html: string): HTMLElement {
 
 beforeEach(() => {
   document.body.innerHTML = '';
+  document.body.className = '';
 });
 
 // ============================================================
@@ -293,6 +295,25 @@ describe('Injection roundtrip', () => {
 
     setTranslationMode('parallel');
     expect(document.body.classList.contains('b3rys-replace-mode')).toBe(false);
+  });
+
+  it('does not apply replace mode while translations are hidden', () => {
+    setupDOM('<p data-b3rys-original>Original text remains visible.</p>');
+    document.body.classList.add('b3rys-hiding-translations');
+
+    setTranslationModeWhenAvailable('replace');
+
+    expect(document.body.classList.contains('b3rys-replace-mode')).toBe(false);
+  });
+
+  it('applies replace mode while translations are visible', () => {
+    setupDOM(
+      '<p data-b3rys-original>Original text.</p>' + '<p data-b3rys-translated>번역문입니다.</p>',
+    );
+
+    setTranslationModeWhenAvailable('replace');
+
+    expect(document.body.classList.contains('b3rys-replace-mode')).toBe(true);
   });
 
   it('replaces previous translation on re-injection (only 1 translation exists)', () => {

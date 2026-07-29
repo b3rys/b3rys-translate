@@ -720,6 +720,16 @@ export function setTranslationMode(mode: TranslationMode): void {
   }
 }
 
+/**
+ * Apply the saved mode only when translations are currently visible.
+ * Callers still persist the mode so the next translation uses it.
+ */
+export function setTranslationModeWhenAvailable(mode: TranslationMode): void {
+  if (hasTranslationsOnPage()) {
+    setTranslationMode(mode);
+  }
+}
+
 const HIDING_CLASS = 'b3rys-hiding-translations';
 
 /**

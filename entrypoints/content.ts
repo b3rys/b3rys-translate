@@ -6,6 +6,7 @@ import {
   cancelTranslation,
   hasTranslationsOnPage,
   setTranslationMode,
+  setTranslationModeWhenAvailable,
 } from './content/translator';
 import { observeDynamicContent } from './content/observer';
 import {
@@ -153,7 +154,7 @@ export default defineContentScript({
     // Mode toggle callback
     fab.onModeToggle((mode) => {
       sm.setMode(mode);
-      setTranslationMode(mode);
+      setTranslationModeWhenAvailable(mode);
       chrome.storage.local.set({ translationMode: mode }).catch(() => {});
     });
 
@@ -182,9 +183,7 @@ export default defineContentScript({
         const mode = changes.translationMode.newValue as TranslationMode;
         sm.setMode(mode);
         fab.setMode(mode);
-        if (hasTranslationsOnPage()) {
-          setTranslationMode(mode);
-        }
+        setTranslationModeWhenAvailable(mode);
       }
 
       // Auto-translate flag: only update the flag here — don't auto-translate
@@ -203,7 +202,7 @@ export default defineContentScript({
       if (message.type === 'TOGGLE_TRANSLATION_MODE') {
         sm.setMode(message.mode);
         fab.setMode(message.mode);
-        setTranslationMode(message.mode);
+        setTranslationModeWhenAvailable(message.mode);
         chrome.storage.local.set({ translationMode: message.mode }).catch(() => {});
       }
       if (message.type === 'TOGGLE_FLOATING_BUTTON') {
