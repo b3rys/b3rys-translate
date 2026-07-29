@@ -167,6 +167,11 @@ function paragraphUnits(el: HTMLElement): HTMLElement[] {
   if (splitEl.hasAttribute(PARA_SPLIT_ATTR)) {
     return [...splitEl.querySelectorAll<HTMLElement>(`[${PARA_ATTR}]`)];
   }
+  // Paragraph wrappers are inline spans. Never put block children (P, UL, etc.)
+  // inside them: that would create invalid nesting, break parent > child CSS,
+  // and make a wrapper's BLOCK_ID hide nested blocks from the TreeWalker.
+  if (!hasOnlyInlineChildren(splitEl)) return [];
+
   // Decide BEFORE mutating: the split moves nodes, so it can't be undone cheaply.
   const paragraphCount = (splitEl.textContent ?? '')
     .split(PARA_BREAK)
@@ -367,6 +372,10 @@ function detectStandardBlocks(root: Element, splitParagraphs = false): TextBlock
   let node: Node | null;
   while ((node = walker.nextNode())) {
     const el = node as HTMLElement;
+    const text = getDirectText(el).trim();
+    // paragraphUnits mutates the live DOM, so reject non-source text and URLs
+    // before attempting a split.
+    if (shouldSkipText(el, text, 1)) continue;
     if (splitParagraphs) {
       const paragraphs = paragraphUnits(el);
       if (paragraphs.length) {
@@ -385,8 +394,6 @@ function detectStandardBlocks(root: Element, splitParagraphs = false): TextBlock
         continue;
       }
     }
-    const text = getDirectText(el).trim();
-    if (shouldSkipText(el, text, 1)) continue;
 
     const id = `b3rys-${++blockCounter}`;
     el.setAttribute(DATA_ATTRS.BLOCK_ID, id);
@@ -530,6 +537,10 @@ function detectLeafTextBlocks(root: Element, splitParagraphs = false): TextBlock
     const el = node as HTMLElement;
     // Skip if ancestor already detected in this Phase 2 run (parent covers this text)
     if (el.parentElement?.closest(`[${DATA_ATTRS.BLOCK_ID}]`)) continue;
+    const text = el.textContent?.trim().replace(/\s+/g, ' ') ?? '';
+    // paragraphUnits mutates the live DOM, so reject non-source text and URLs
+    // before attempting a split.
+    if (shouldSkipText(el, text, 2)) continue;
     if (splitParagraphs) {
       const paragraphs = paragraphUnits(el);
       if (paragraphs.length) {
@@ -548,8 +559,6 @@ function detectLeafTextBlocks(root: Element, splitParagraphs = false): TextBlock
         continue;
       }
     }
-    const text = el.textContent?.trim().replace(/\s+/g, ' ') ?? '';
-    if (shouldSkipText(el, text, 2)) continue;
 
     const id = `b3rys-${++blockCounter}`;
     el.setAttribute(DATA_ATTRS.BLOCK_ID, id);
