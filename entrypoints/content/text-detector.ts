@@ -433,6 +433,23 @@ const PHASE2_INLINE_TAGS = new Set([
   'TIME',
 ]);
 
+/**
+ * 문단 구분(빈 줄)을 남긴 채 공백만 정리한다.
+ *   기본 경로는 `\s+ → ' '` 라 ★개행까지 공백이 된다★ — 그래서 작성자가 넣은 문단 구분이
+ *   번역기에 도달하기 전에 사라지고, 긴 글이 한 덩어리로 번역돼 돌아온다(X 실측).
+ *   ★site rule 이 splitParagraphs 를 켠 사이트에서만★ 이 함수를 쓴다. 그 외 사이트는
+ *   기존 동작(모든 공백 붕괴)이 글자 그대로 유지된다.
+ */
+function normalizeKeepBlankLines(raw: string): string {
+  return raw
+    .replace(/\r\n?/g, '\n')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/ ?\n ?/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/(?<!\n)\n(?!\n)/g, ' ')
+    .trim();
+}
+
 function hasOnlyInlineChildren(el: HTMLElement): boolean {
   for (const child of el.children) {
     if (!PHASE2_INLINE_TAGS.has(child.tagName)) return false;
@@ -537,7 +554,9 @@ function detectLeafTextBlocks(root: Element, splitParagraphs = false): TextBlock
     const el = node as HTMLElement;
     // Skip if ancestor already detected in this Phase 2 run (parent covers this text)
     if (el.parentElement?.closest(`[${DATA_ATTRS.BLOCK_ID}]`)) continue;
-    const text = el.textContent?.trim().replace(/\s+/g, ' ') ?? '';
+    const text = splitParagraphs
+      ? normalizeKeepBlankLines(el.textContent ?? '')
+      : (el.textContent?.trim().replace(/\s+/g, ' ') ?? '');
     // paragraphUnits mutates the live DOM, so reject non-source text and URLs
     // before attempting a split.
     if (shouldSkipText(el, text, 2)) continue;
