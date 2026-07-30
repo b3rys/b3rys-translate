@@ -162,6 +162,23 @@ function paragraphUnits(el: HTMLElement): HTMLElement[] {
   );
   if (!hasDirectText && el.children.length === 1) {
     splitEl = el.children[0] as HTMLElement;
+  } else if (!hasDirectText) {
+    // x.com puts the whole post inside one inline <span> and hangs a second
+    // <span> off it for the trailing link, so the blank lines never appear at
+    // the top level and the split below finds nothing to cut. Descend into the
+    // one child that actually carries them.
+    //
+    // Deliberately narrow: it must be the ONLY child holding a blank line in a
+    // direct text node. With two such children the paragraphs span a boundary
+    // this function cannot wrap, and descending would silently drop the rest.
+    const carriers = [...el.children].filter((child) =>
+      [...child.childNodes].some(
+        (node) => node.nodeType === Node.TEXT_NODE && PARA_BREAK.test(node.textContent ?? ''),
+      ),
+    );
+    if (carriers.length === 1 && hasOnlyInlineChildren(carriers[0] as HTMLElement)) {
+      splitEl = carriers[0] as HTMLElement;
+    }
   }
 
   if (splitEl.hasAttribute(PARA_SPLIT_ATTR)) {
