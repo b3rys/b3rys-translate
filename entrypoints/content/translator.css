@@ -14,7 +14,7 @@
 .b3rys-translation {
   display: block;
   color: inherit; /* color-mix 를 모르는 구형 브라우저 폴백 */
-  color: color-mix(in srgb, currentColor 82%, transparent);
+  color: color-mix(in srgb, currentColor 80%, transparent);
   font-family: inherit;
   font-weight: inherit;
   line-height: inherit;
@@ -30,7 +30,7 @@
 
 .b3rys-translation-inline {
   color: inherit;
-  color: color-mix(in srgb, currentColor 82%, transparent);
+  color: color-mix(in srgb, currentColor 80%, transparent);
   font-family: inherit;
   font-weight: inherit;
   font-size: 0.95em;
