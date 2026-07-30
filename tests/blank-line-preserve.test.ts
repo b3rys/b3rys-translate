@@ -46,3 +46,61 @@ describe('빈 줄 보존 — 다른 사이트에 영향 없음', () => {
     expect(prompt).toContain('Do not add explanations or notes');
   });
 });
+
+// ─────────────────────────────────────────────────────────────
+// 텍스트 추출 단계 — 번역기로 보내는 글에 빈 줄이 남는가
+// 원래 `\s+ → ' '` 라 개행까지 공백이 됐고, 그래서 번역기는 문단 구분을
+// 애초에 받지 못했다(X 실측: 긴 글이 한 덩어리로 번역됨).
+import { describe as d2, it as it2, expect as e2, beforeEach as be2 } from 'vitest';
+import { detectTextBlocks } from '../entrypoints/content/text-detector';
+
+function stubHost(h: string): void {
+  Object.defineProperty(window, 'location', {
+    value: { hostname: h, href: `https://${h}/` },
+    writable: true,
+  });
+}
+function renderTweetLike(host: string): void {
+  stubHost(host);
+  document.body.innerHTML = '';
+  const d = document.createElement('div');
+  d.setAttribute('data-testid', 'tweetText');
+  const s = document.createElement('span');
+  s.style.whiteSpace = 'pre-wrap';
+  s.innerHTML = '<span>First paragraph here.\n\nSecond paragraph here.\n\nThird one.</span>';
+  d.appendChild(s);
+  document.body.appendChild(d);
+}
+
+d2('텍스트 추출 — 빈 줄 보존 범위', () => {
+  be2(() => {
+    document.body.innerHTML = '';
+  });
+
+  it2('splitParagraphs 사이트(x.com)는 빈 줄을 유지한다', () => {
+    renderTweetLike('x.com');
+    const text = detectTextBlocks(document.body)[0]?.text ?? '';
+    e2(/\n[ \t]*\n/.test(text)).toBe(true);
+  });
+
+  it2('★규칙이 없는 사이트는 기존대로 모든 공백을 붕괴시킨다★', () => {
+    renderTweetLike('example.com');
+    const text = detectTextBlocks(document.body)[0]?.text ?? '';
+    e2(/\n/.test(text)).toBe(false);
+    e2(text).toBe('First paragraph here. Second paragraph here. Third one.');
+  });
+
+  it2('빈 줄이 아닌 단일 개행은 공백으로 접힌다 (문단이 아니므로)', () => {
+    stubHost('x.com');
+    document.body.innerHTML = '';
+    const d = document.createElement('div');
+    d.setAttribute('data-testid', 'tweetText');
+    const s = document.createElement('span');
+    s.style.whiteSpace = 'pre-wrap';
+    s.innerHTML = '<span>One line\nstill the same sentence continues here.</span>';
+    d.appendChild(s);
+    document.body.appendChild(d);
+    const text = detectTextBlocks(document.body)[0]?.text ?? '';
+    e2(text).toBe('One line still the same sentence continues here.');
+  });
+});
