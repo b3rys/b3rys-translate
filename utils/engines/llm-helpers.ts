@@ -16,11 +16,19 @@ export function buildTranslationPrompt(
   const tgt = tgtName(lang ?? {});
   const numbered = paragraphs.map((p, i) => `[${i + 1}] ${p.text}`).join('\n\n');
 
+  // ★빈 줄이 있는 항목이 하나라도 있을 때만 한 줄을 더한다★ — 없으면 프롬프트가 이전과 ★글자 단위로 동일★ 하다.
+  //   X 같은 사이트는 긴 글 하나를 통째로 보내는데, 그 안의 빈 줄이 번역에서 사라져 한 덩어리로 돌아온다.
+  //   빈 줄이 없는 글(대부분의 사이트)에는 이 지시가 붙지 않으므로 기존 동작이 그대로다.
+  const hasBlankLine = paragraphs.some((p) => /\n[ \t]*\n/.test(p.text));
+  const keepBlankLines = hasBlankLine
+    ? '\nKeep blank lines exactly where they appear inside a paragraph — they separate the author\u2019s paragraphs and must survive translation.'
+    : '';
+
   return `You are a professional translator. Translate each numbered paragraph below into ${tgt}.
 Return ONLY the ${tgt} translations, each prefixed with its number in the same [N] format.
 Maintain the original meaning, tone, and paragraph structure.
 Preserve all HTML tags (<a>, <code>, <strong>, <em>, etc.) exactly as they appear. Only translate the text content within them, not the tags or their attributes.
-Do not add explanations or notes.
+Do not add explanations or notes.${keepBlankLines}
 
 ${numbered}`;
 }
