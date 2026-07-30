@@ -17,6 +17,14 @@ function renderTweet(text: string): HTMLElement {
   return tweet;
 }
 
+function renderTweetHtml(html: string): HTMLElement {
+  document.body.innerHTML = '';
+  const tweet = document.createElement('div');
+  tweet.innerHTML = html;
+  document.body.appendChild(tweet);
+  return tweet;
+}
+
 describe('X paragraph splitting site rule', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
@@ -47,6 +55,74 @@ describe('X paragraph splitting site rule', () => {
       ]);
       expect(tweet.textContent).toBe(before);
       expect(tweet.querySelectorAll('[data-b3rys-para]')).toHaveLength(3);
+    },
+  );
+
+  it.each(
+    ['x.com', 'twitter.com'].flatMap((hostname) => [
+      [
+        hostname,
+        'two BR elements',
+        '<span>The first paragraph explains the opening idea in enough detail.<br><br>' +
+          'The second paragraph develops a separate point for the reader.</span>',
+      ],
+      [
+        hostname,
+        'sibling spans',
+        '<span><span>The first paragraph explains the opening idea in enough detail.</span>' +
+          '<span>The second paragraph develops a separate point for the reader.</span></span>',
+      ],
+      [
+        hostname,
+        'sibling divs',
+        '<div>The first paragraph explains the opening idea in enough detail.</div>' +
+          '<div>The second paragraph develops a separate point for the reader.</div>',
+      ],
+    ]),
+  )('splits an actual %s-style tweet with %s', (hostname, _structure, html) => {
+    stubLocation(hostname);
+    const tweet = renderTweetHtml(html);
+    const before = tweet.textContent;
+
+    const blocks = detectTextBlocks(document.body);
+
+    expect(blocks.map((block) => block.text)).toEqual([
+      'The first paragraph explains the opening idea in enough detail.',
+      'The second paragraph develops a separate point for the reader.',
+    ]);
+    expect(tweet.textContent).toBe(before);
+  });
+
+  it('keeps a single BR inside one paragraph wrapper', () => {
+    stubLocation('x.com');
+    renderTweetHtml(
+      '<span>The opening line introduces a list.<br>- First item stays on its own line.' +
+        '<br><br>The closing paragraph remains a separate translation unit.</span>',
+    );
+
+    const blocks = detectTextBlocks(document.body);
+
+    expect(blocks.map((block) => block.text)).toEqual([
+      'The opening line introduces a list.\n- First item stays on its own line.',
+      'The closing paragraph remains a separate translation unit.',
+    ]);
+    expect(blocks[0].element.querySelectorAll('br')).toHaveLength(1);
+  });
+
+  it.each(['github.com', 'substack.com', 'mail.google.com', 'skilljar.com'])(
+    'does not enable BR splitting on %s',
+    (hostname) => {
+      stubLocation(hostname);
+      const tweet = renderTweetHtml(
+        '<span>The first paragraph explains the opening idea in enough detail.<br><br>' +
+          'The second paragraph develops a separate point for the reader.</span>',
+      );
+
+      const blocks = detectTextBlocks(document.body);
+
+      expect(blocks).toHaveLength(1);
+      expect(blocks[0].element).toBe(tweet);
+      expect(tweet.querySelector('[data-b3rys-para]')).toBeNull();
     },
   );
 
