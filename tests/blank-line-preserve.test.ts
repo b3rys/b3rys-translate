@@ -77,10 +77,12 @@ d2('텍스트 추출 — 빈 줄 보존 범위', () => {
     document.body.innerHTML = '';
   });
 
-  it2('splitParagraphs 사이트(x.com)는 빈 줄을 유지한다', () => {
+  it2('splitParagraphs 사이트(x.com)는 문단마다 별도 블록이 된다', () => {
     renderTweetLike('x.com');
-    const text = detectTextBlocks(document.body)[0]?.text ?? '';
-    e2(/\n[ \t]*\n/.test(text)).toBe(true);
+    // 문단이 쪼개지므로 블록 하나에는 빈 줄이 남지 않는다. 빈 줄 보존은
+    // 쪼개기가 거절될 때를 위한 안전망으로 남아 있다 (아래 단일 개행 테스트).
+    const texts = detectTextBlocks(document.body).map((b) => b.text);
+    e2(texts).toEqual(['First paragraph here.', 'Second paragraph here.', 'Third one.']);
   });
 
   it2('★규칙이 없는 사이트는 기존대로 모든 공백을 붕괴시킨다★', () => {

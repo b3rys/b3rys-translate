@@ -162,23 +162,6 @@ function paragraphUnits(el: HTMLElement): HTMLElement[] {
   );
   if (!hasDirectText && el.children.length === 1) {
     splitEl = el.children[0] as HTMLElement;
-  } else if (!hasDirectText) {
-    // x.com puts the whole post inside one inline <span> and hangs a second
-    // <span> off it for the trailing link, so the blank lines never appear at
-    // the top level and the split below finds nothing to cut. Descend into the
-    // one child that actually carries them.
-    //
-    // Deliberately narrow: it must be the ONLY child holding a blank line in a
-    // direct text node. With two such children the paragraphs span a boundary
-    // this function cannot wrap, and descending would silently drop the rest.
-    const carriers = [...el.children].filter((child) =>
-      [...child.childNodes].some(
-        (node) => node.nodeType === Node.TEXT_NODE && PARA_BREAK.test(node.textContent ?? ''),
-      ),
-    );
-    if (carriers.length === 1 && hasOnlyInlineChildren(carriers[0] as HTMLElement)) {
-      splitEl = carriers[0] as HTMLElement;
-    }
   }
 
   if (splitEl.hasAttribute(PARA_SPLIT_ATTR)) {
@@ -195,6 +178,87 @@ function paragraphUnits(el: HTMLElement): HTMLElement[] {
     .filter((s) => s.trim()).length;
   if (paragraphCount < 2) return [];
 
+  // Shallow first: cut only at top-level text nodes, which leaves every nested
+  // element whole. That is what antirez.com and the news rules already rely on,
+  // so it must keep winning wherever it works at all.
+  let pass = buildParagraphWrappers(splitEl, false);
+
+  if (pass.wrappers.length < 2) {
+    revertWrappers(splitEl, pass);
+    // Shallow found nothing. x.com is the case that needs more: it chops a post
+    // into sibling <span>s at arbitrary points, so a blank line usually sits
+    // INSIDE one of them and a paragraph runs across several. Cut through the
+    // nested elements too — see splitNodeAtBreaks.
+    const backup = [...splitEl.childNodes].map((n) => n.cloneNode(true));
+    pass = buildParagraphWrappers(splitEl, true);
+    if (pass.wrappers.length < 2) {
+      // Deep pass clones the elements it cuts, so unwinding it would strip their
+      // styling. Restore the pre-pass copy instead.
+      splitEl.replaceChildren(...backup);
+      return [];
+    }
+  }
+
+  splitEl.setAttribute(PARA_SPLIT_ATTR, 'true');
+  splitEl.replaceChildren(...pass.rebuilt);
+  return pass.wrappers;
+}
+
+/** A text node that is nothing but a paragraph separator. */
+function isBreakOnly(text: string): boolean {
+  return PARA_BREAK.test(text) && !text.trim();
+}
+
+/**
+ * Flatten a node so every paragraph break becomes a top-level separator text
+ * node, splitting inline elements that straddle one into a clone per side.
+ *
+ * Needed because x.com renders a post as
+ *   span > [span "Hello people of Sol! I've ", span "reset",
+ *           span "\n\n usage limits for…", span "As a result…"]
+ * — the blank lines live inside the grandchildren and a paragraph runs across
+ * several of them, so nothing at the top level marks a boundary. Cloning keeps
+ * each side styled the same as the element it came from.
+ */
+function splitNodeAtBreaks(node: Node): Node[] {
+  if (node.nodeType === Node.TEXT_NODE) {
+    return (node.textContent ?? '')
+      .split(/(\n(?:[ \t]*\n)+)/)
+      .filter(Boolean)
+      .map((part) => document.createTextNode(part));
+  }
+  if (node.nodeType !== Node.ELEMENT_NODE) return [node];
+  const el = node as HTMLElement;
+  // No break inside → hand back the original node, untouched and uncloned.
+  if (!PARA_BREAK.test(el.textContent ?? '')) return [node];
+
+  const out: Node[] = [];
+  let piece = el.cloneNode(false) as HTMLElement;
+  const closePiece = (): void => {
+    if (piece.childNodes.length) out.push(piece);
+    piece = el.cloneNode(false) as HTMLElement;
+  };
+  for (const child of [...el.childNodes]) {
+    for (const part of splitNodeAtBreaks(child)) {
+      if (part.nodeType === Node.TEXT_NODE && isBreakOnly(part.textContent ?? '')) {
+        closePiece();
+        out.push(part);
+      } else {
+        piece.appendChild(part);
+      }
+    }
+  }
+  closePiece();
+  return out;
+}
+
+interface ParagraphPass {
+  rebuilt: Node[];
+  wrappers: HTMLElement[];
+}
+
+/** Wrap each paragraph of `splitEl` in a span. `deep` also cuts inside elements. */
+function buildParagraphWrappers(splitEl: HTMLElement, deep: boolean): ParagraphPass {
   const rebuilt: Node[] = [];
   const wrappers: HTMLElement[] = [];
   let current: Node[] = [];
@@ -221,8 +285,12 @@ function paragraphUnits(el: HTMLElement): HTMLElement[] {
     current = [];
   };
 
-  for (const node of [...splitEl.childNodes]) {
-    // Blank lines inside a nested element (e.g. <b>) are not boundaries; only a
+  const stream = deep
+    ? [...splitEl.childNodes].flatMap(splitNodeAtBreaks)
+    : [...splitEl.childNodes];
+
+  for (const node of stream) {
+    // Shallow: blank lines inside a nested element are not boundaries; only a
     // top-level text node splits, which keeps inline markup intact.
     if (node.nodeType !== Node.TEXT_NODE || !PARA_BREAK.test(node.textContent ?? '')) {
       current.push(node);
@@ -233,7 +301,7 @@ function paragraphUnits(el: HTMLElement): HTMLElement[] {
     // line's indentation, and indentation is exactly what marks a code block.
     for (const part of (node.textContent ?? '').split(/(\n(?:[ \t]*\n)+)/)) {
       if (!part) continue;
-      if (PARA_BREAK.test(part) && !part.trim()) {
+      if (isBreakOnly(part)) {
         flush();
         rebuilt.push(document.createTextNode(part));
       } else {
@@ -243,18 +311,16 @@ function paragraphUnits(el: HTMLElement): HTMLElement[] {
   }
   flush();
 
-  if (wrappers.length < 2) {
-    // The blank lines sat somewhere that didn't yield separate units after all.
-    // Put the original children back so the caller sees an untouched element.
-    splitEl.replaceChildren(
-      ...rebuilt.flatMap((n) => (wrappers.includes(n as HTMLElement) ? [...n.childNodes] : [n])),
-    );
-    return [];
-  }
+  return { rebuilt, wrappers };
+}
 
-  splitEl.setAttribute(PARA_SPLIT_ATTR, 'true');
-  splitEl.replaceChildren(...rebuilt);
-  return wrappers;
+/** Undo a pass by unwrapping its wrappers back into `splitEl`. */
+function revertWrappers(splitEl: HTMLElement, pass: ParagraphPass): void {
+  splitEl.replaceChildren(
+    ...pass.rebuilt.flatMap((n) =>
+      pass.wrappers.includes(n as HTMLElement) ? [...n.childNodes] : [n],
+    ),
+  );
 }
 
 // ============================================================
