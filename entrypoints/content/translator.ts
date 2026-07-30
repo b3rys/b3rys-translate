@@ -1000,6 +1000,7 @@ function injectNavItem(element: HTMLElement, sanitized: string, text: string): v
     span.textContent = (temp.children[0].textContent ?? '').trim();
   } else {
     span.innerHTML = sanitized;
+    preserveBlankLines(span);
   }
 
   const link = element.tagName === 'LI' ? element.querySelector('a') : element;
@@ -1015,6 +1016,7 @@ function injectAsSibling(element: HTMLElement, sanitized: string, truncated: boo
   const span = document.createElement('span');
   span.setAttribute(DATA_ATTRS.TRANSLATED, 'true');
   span.innerHTML = sanitized;
+  preserveBlankLines(span);
 
   const elDisplay = getComputedStyle(element).display;
   const parent = element.parentElement;
@@ -1050,6 +1052,7 @@ function injectForceReplace(element: HTMLElement, sanitized: string): void {
   const span = document.createElement('span');
   span.setAttribute(DATA_ATTRS.TRANSLATED, 'true');
   span.innerHTML = sanitized;
+  preserveBlankLines(span);
   span.className = 'b3rys-translation';
   span.style.marginTop = '0';
   element.appendChild(span);
@@ -1065,6 +1068,7 @@ function injectBlock(
   const span = document.createElement('span');
   span.setAttribute(DATA_ATTRS.TRANSLATED, 'true');
   span.innerHTML = sanitized;
+  preserveBlankLines(span);
 
   const alwaysBlock = /^(H[1-6]|P|BLOCKQUOTE|LABEL)$/.test(element.tagName);
   if (!alwaysBlock && text.length <= INLINE_MAX_LENGTH) {
@@ -1198,6 +1202,18 @@ function findLargestTextChild(element: HTMLElement): HTMLElement | undefined {
     }
   }
   return best;
+}
+
+/**
+ * ★번역문에 빈 줄이 있을 때만★ 줄바꿈이 보이게 한다.
+ *   원문에 작성자가 넣은 빈 줄이 있고 번역도 그것을 지켜서 돌아온 경우에만 걸린다.
+ *   빈 줄이 없는 번역문(대부분의 사이트)에는 ★아무 것도 하지 않는다★ — 기존 렌더링 그대로다.
+ *   사이트 목록에 의존하지 않는다: 조건이 "이 번역문에 빈 줄이 있는가" 뿐이라, 어떤 사이트든
+ *   빈 줄이 없으면 이 코드는 닿지 않는다.
+ */
+function preserveBlankLines(span: HTMLElement): void {
+  if (!/\n[ \t]*\n/.test(span.textContent ?? '')) return;
+  span.style.whiteSpace = 'pre-wrap';
 }
 
 function applyTruncationStyles(span: HTMLElement): void {
