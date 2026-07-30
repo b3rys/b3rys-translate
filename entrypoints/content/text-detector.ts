@@ -118,6 +118,13 @@ const PARA_BREAK = /\n[ \t]*\n/;
 /** Characters that are ordinary in code and rare in a run of English prose. */
 const CODE_CHARS = /[{};=()<>[\]]/g;
 
+/** textContent omits BR entirely; retain authored line breaks for translation. */
+function textWithLineBreaks(el: HTMLElement): string {
+  const clone = el.cloneNode(true) as HTMLElement;
+  for (const br of clone.querySelectorAll('br')) br.replaceWith('\n');
+  return clone.textContent ?? '';
+}
+
 /**
  * Is this paragraph a code block rather than prose?
  *
@@ -172,10 +179,26 @@ function paragraphUnits(el: HTMLElement): HTMLElement[] {
   // and make a wrapper's BLOCK_ID hide nested blocks from the TreeWalker.
   if (!hasOnlyInlineChildren(splitEl)) return [];
 
+  const directChildren = [...splitEl.children] as HTMLElement[];
+  const textChildren = directChildren.filter((child) => (child.textContent ?? '').trim());
+  const hasLooseText = [...splitEl.childNodes].some(
+    (node) => node.nodeType === Node.TEXT_NODE && !!(node.textContent ?? '').trim(),
+  );
+  // X renders some posts as one span per visual paragraph, without whitespace
+  // text nodes between them. Treat those direct spans as paragraph units, but
+  // do not generalize this to arbitrary inline markup (strong/em/a).
+  const splitAtSpanBoundaries =
+    !hasLooseText &&
+    textChildren.length >= 2 &&
+    textChildren.every((child) => child.tagName === 'SPAN');
+  const brParagraphCount = splitEl.querySelectorAll(':scope > br + br').length > 0 ? 2 : 0;
+
   // Decide BEFORE mutating: the split moves nodes, so it can't be undone cheaply.
-  const paragraphCount = (splitEl.textContent ?? '')
-    .split(PARA_BREAK)
-    .filter((s) => s.trim()).length;
+  const paragraphCount = Math.max(
+    (splitEl.textContent ?? '').split(PARA_BREAK).filter((s) => s.trim()).length,
+    brParagraphCount,
+    splitAtSpanBoundaries ? textChildren.length : 0,
+  );
   if (paragraphCount < 2) return [];
 
   const rebuilt: Node[] = [];
@@ -204,7 +227,34 @@ function paragraphUnits(el: HTMLElement): HTMLElement[] {
     current = [];
   };
 
-  for (const node of [...splitEl.childNodes]) {
+  const childNodes = [...splitEl.childNodes];
+  for (let index = 0; index < childNodes.length; index++) {
+    const node = childNodes[index];
+    if (node instanceof HTMLBRElement) {
+      const run: Node[] = [node];
+      while (childNodes[index + 1] instanceof HTMLBRElement) {
+        run.push(childNodes[++index]);
+      }
+      if (run.length >= 2) {
+        flush();
+        rebuilt.push(...run);
+      } else {
+        // A single BR is a line break inside a paragraph, not a blank-line
+        // paragraph boundary. Keeping it in the wrapper preserves list layout.
+        current.push(node);
+      }
+      continue;
+    }
+    if (
+      splitAtSpanBoundaries &&
+      node.nodeType === Node.ELEMENT_NODE &&
+      (node.textContent ?? '').trim()
+    ) {
+      flush();
+      current.push(node);
+      flush();
+      continue;
+    }
     // Blank lines inside a nested element (e.g. <b>) are not boundaries; only a
     // top-level text node splits, which keeps inline markup intact.
     if (node.nodeType !== Node.TEXT_NODE || !PARA_BREAK.test(node.textContent ?? '')) {
@@ -385,7 +435,7 @@ function detectStandardBlocks(root: Element, splitParagraphs = false): TextBlock
             paragraph.hasAttribute(DATA_ATTRS.BLOCK_ID)
           )
             continue;
-          const text = getDirectText(paragraph).trim();
+          const text = textWithLineBreaks(paragraph).trim();
           if (shouldSkipText(paragraph, text, 1)) continue;
           const id = `b3rys-${++blockCounter}`;
           paragraph.setAttribute(DATA_ATTRS.BLOCK_ID, id);
@@ -550,7 +600,9 @@ function detectLeafTextBlocks(root: Element, splitParagraphs = false): TextBlock
             paragraph.hasAttribute(DATA_ATTRS.BLOCK_ID)
           )
             continue;
-          const text = paragraph.textContent?.trim().replace(/\s+/g, ' ') ?? '';
+          const text = textWithLineBreaks(paragraph)
+            .trim()
+            .replace(/[ \t]+/g, ' ');
           if (shouldSkipText(paragraph, text, 2)) continue;
           const id = `b3rys-${++blockCounter}`;
           paragraph.setAttribute(DATA_ATTRS.BLOCK_ID, id);
