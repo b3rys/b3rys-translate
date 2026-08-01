@@ -3,6 +3,8 @@
 웹페이지 원문을 유지하면서 바로 아래에 번역을 표시하는 Chrome 확장 프로그램.
 YouTube 이중자막(원문 + 번역)도 지원합니다.
 
+[b3rys translate 크롬 웹스토어 가기](https://chromewebstore.google.com/detail/b3rys-translate/dgmmidkccokcnofpkbcnmiapkpbmdffe?fbclid=IwY2xjawTaNPlleHRuA2FlbQIxMQBzcnRjBmFwcF9pZBAyMjIwMzkxNzg4MjAwODkyAAEeUIqk7nr3_7F6h7kQu0942-OUvo3unKctLIaGchQNjjwnDNR3VTaa2LL5u7M_aem_AOZSvq3_9fW0oRHO4QWoBg)
+
 > _A bilingual translation Chrome extension — keeps the original text and shows the translation right below it, paragraph by paragraph. Works on web pages and YouTube subtitles._
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
