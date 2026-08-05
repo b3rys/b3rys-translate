@@ -1132,8 +1132,9 @@ function injectBlock(
     return;
   }
 
-  // Nowrap elements (buttons, badge-like links): force line break for translation
-  // Skip if truncated — truncation handler already sets appropriate nowrap styles
+  // Nowrap elements (buttons, badge-like links): force a line break for translation.
+  // Skip only when content is actually truncated; inactive ellipsis declarations
+  // on a wrapping child must not suppress the break.
   // Skip inside <nav> — nav items should stay inline
   const insideNav = !!element.closest('nav');
   if (
@@ -1225,9 +1226,10 @@ function applyTruncationStyles(span: HTMLElement): void {
 }
 
 /**
- * Check if element or its direct children have CSS text truncation.
- * Requires BOTH text-overflow: ellipsis AND overflow: hidden/clip —
- * text-overflow alone has no visual effect per CSS spec.
+ * Check if the element or one of its direct children is actively truncating text.
+ * Ellipsis + hidden/clip is only sufficient for non-wrapping text; wrapping text
+ * must also overflow its rendered box. If layout cannot be observed, preserve the
+ * declarations conservatively rather than risk expanding intentionally clipped UI.
  */
 function isContentTruncated(element: HTMLElement): boolean {
   if (hasActiveTruncation(element)) return true;
@@ -1240,7 +1242,19 @@ function isContentTruncated(element: HTMLElement): boolean {
 function hasActiveTruncation(el: HTMLElement): boolean {
   const style = getComputedStyle(el);
   if (style.textOverflow !== 'ellipsis') return false;
-  return style.overflow === 'hidden' || style.overflow === 'clip';
+  if (style.overflow !== 'hidden' && style.overflow !== 'clip') return false;
+
+  // `text-overflow: ellipsis` does not truncate normally wrapping text by itself.
+  // Some sites (for example Google DeepMind figure captions) keep ellipsis and
+  // overflow on every caption, then switch between `normal` and `nowrap` with a
+  // custom property. Treating the always-present declarations as active made us
+  // force the translated span to one line even while the source caption expanded.
+  if (style.whiteSpace === 'nowrap' || style.whiteSpace === 'pre') return true;
+
+  // Wrapped text can still be genuinely clipped by a fixed width/height. Compare
+  // the rendered content box so those cases keep the site's truncation behavior.
+  if (el.getClientRects().length === 0) return true;
+  return el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1;
 }
 
 /**
