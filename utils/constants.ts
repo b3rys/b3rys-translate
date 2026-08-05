@@ -1,3 +1,5 @@
+import { version } from '../package.json';
+
 export const ENGINE_ENDPOINTS = {
   gemini:
     'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent',
@@ -8,7 +10,7 @@ export const ENGINE_ENDPOINTS = {
 
 /** Logged at content-script startup so the running bundle can be identified
  * in DevTools (stale bundles after a rebuild look identical otherwise). */
-export const BUILD_TAG = '0.5.24';
+export const BUILD_TAG = version;
 
 export const BATCH_SIZE = 15;
 export const VIEWPORT_BATCH_SIZE = 5;
