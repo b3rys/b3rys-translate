@@ -48,7 +48,7 @@ describe('model catalog', () => {
 
   it('keeps official per-model prices in the same source of truth', () => {
     expect(getModelConfig('gpt-5.4-nano').pricing).toEqual({ input: 0.2, output: 1.25 });
-    expect(getModelConfig('gpt-5.6-luna').pricing).toEqual({ input: 1, output: 6 });
+    expect(getModelConfig('gpt-5.6-luna').pricing).toEqual({ input: 0.2, output: 1.2 });
     expect(getModelConfig('gemini-3.1-flash-lite').pricing).toEqual({
       input: 0.25,
       output: 1.5,
@@ -58,7 +58,7 @@ describe('model catalog', () => {
   it('calculates usage with the selected model price', () => {
     expect(
       calculateModelCost('gpt-5.6-luna', { inputTokens: 1_000_000, outputTokens: 500_000 }),
-    ).toBe(4);
+    ).toBe(0.8);
     expect(
       calculateModelCost('gpt-5.4-nano', { inputTokens: 1_000_000, outputTokens: 500_000 }),
     ).toBe(0.825);
