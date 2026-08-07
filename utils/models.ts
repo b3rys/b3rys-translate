@@ -48,10 +48,13 @@ export const MODEL_CATALOG: readonly ModelConfig[] = [
     pricing: { input: 0.2, output: 1.25 },
   },
   {
+    // 2026-08-07 인하 반영: $1/$6 → $0.20/$1.20 (공급사 공개 요금표 short-context 기준).
+    // 같은 표의 gpt-5.4-nano 가 $0.20/$1.25 로 아래 항목과 일치해 short-context 열이 맞다.
+    // ★출력 단가가 nano($1.25)보다 싸졌다★ — 기본 모델 재검토 대상이지만 그건 별건이다.
     id: 'gpt-5.6-luna',
     engine: 'openai',
     label: 'GPT-5.6 Luna',
-    pricing: { input: 1, output: 6 },
+    pricing: { input: 0.2, output: 1.2 },
   },
   {
     id: 'claude-haiku-4-5-20251001',
