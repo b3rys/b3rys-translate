@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   isLikelyEnglish,
   hasMinLength,
@@ -7,6 +7,8 @@ import {
   splitSentences,
   parseWordResponse,
   highlightWord,
+  findEnglishVoice,
+  speakWord,
 } from '@/entrypoints/content/selection-popup';
 
 describe('isLikelyEnglish', () => {
@@ -148,5 +150,93 @@ describe('highlightWord', () => {
     const result = highlightWord('the cat sat on the mat', 'the');
     const count = (result.match(/b3rys-sel-highlight/g) || []).length;
     expect(count).toBe(2);
+  });
+});
+
+// ── 발음(TTS) ────────────────────────────────────────────────────────────────
+// 회귀 대상: `speechSynthesis.getVoices()` 는 첫 호출에 빈 배열을 준다(목록을 비동기로 채운다).
+// 예전 코드는 클릭 시점에 그 값을 그대로 써서, ★첫 재생만 브라우저 기본 목소리★ 로 나갔다.
+// 기본값이 한국어 음성인 기기에서는 한국어 엔진이 영어 단어를 읽어 발음이 뭉개진다.
+describe('findEnglishVoice', () => {
+  const v = (name: string, lang: string, localService = false) =>
+    ({ name, lang, localService }) as SpeechSynthesisVoice;
+
+  it('Google 영어 목소리를 가장 먼저 고른다', () => {
+    const voices = [
+      v('유나', 'ko-KR', true),
+      v('Samantha', 'en-US', true),
+      v('Google US English', 'en-US'),
+    ];
+    expect(findEnglishVoice(voices)?.name).toBe('Google US English');
+  });
+
+  it('Google 이 없으면 원격 en-US 를 고른다 (로컬은 건너뛴다)', () => {
+    const voices = [v('Samantha', 'en-US', true), v('Alloy', 'en-US', false)];
+    expect(findEnglishVoice(voices)?.name).toBe('Alloy');
+  });
+
+  it('영어 목소리가 없으면 null — 한국어를 영어 대신 쓰지 않는다', () => {
+    expect(findEnglishVoice([v('유나', 'ko-KR', true)])).toBeNull();
+  });
+
+  it('빈 목록이면 null', () => {
+    expect(findEnglishVoice([])).toBeNull();
+  });
+});
+
+describe('speakWord — 목록이 비어 있는 첫 재생', () => {
+  const GOOGLE = {
+    name: 'Google US English',
+    lang: 'en-US',
+    localService: false,
+  } as SpeechSynthesisVoice;
+  let spoken: Array<{ text: string; voice: SpeechSynthesisVoice | null }>;
+  let listeners: Array<() => void>;
+  let voices: SpeechSynthesisVoice[];
+
+  beforeEach(() => {
+    spoken = [];
+    listeners = [];
+    voices = [];
+    class FakeUtterance {
+      voice: SpeechSynthesisVoice | null = null;
+      lang = '';
+      rate = 1;
+      constructor(public text: string) {}
+    }
+    vi.stubGlobal('SpeechSynthesisUtterance', FakeUtterance);
+    vi.stubGlobal('speechSynthesis', {
+      getVoices: () => voices,
+      cancel: () => {},
+      speak: (u: { text: string; voice: SpeechSynthesisVoice | null }) =>
+        spoken.push({ text: u.text, voice: u.voice }),
+      addEventListener: (_: string, fn: () => void) => listeners.push(fn),
+      removeEventListener: () => {},
+    });
+  });
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('★목록이 비면 즉시 말하지 않는다★ — 그대로 말하면 기본(한국어) 목소리로 나간다', () => {
+    speakWord('annum');
+    expect(spoken).toHaveLength(0);
+  });
+
+  it('★목록이 채워진 뒤 Google 목소리로 말한다★', async () => {
+    speakWord('annum');
+    voices = [{ name: '유나', lang: 'ko-KR', localService: true } as SpeechSynthesisVoice, GOOGLE];
+    listeners.forEach((fn) => fn()); // voiceschanged
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(spoken).toHaveLength(1);
+    expect(spoken[0].text).toBe('annum');
+    expect(spoken[0].voice?.name).toBe('Google US English');
+  });
+
+  it('목록이 이미 있으면 기다리지 않고 바로 말한다 (사용자 제스처 문맥 유지)', () => {
+    voices = [GOOGLE];
+    speakWord('annum');
+    expect(spoken).toHaveLength(1);
+    expect(spoken[0].voice?.name).toBe('Google US English');
   });
 });
