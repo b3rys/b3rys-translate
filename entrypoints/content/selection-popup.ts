@@ -33,6 +33,67 @@ const SPEAK_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
   <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
 </svg>`;
 
+// ── 발음: 목소리 목록이 채워진 뒤에 고른다 ──────────────────────────────────
+// `speechSynthesis.getVoices()` 는 ★첫 호출에 빈 배열을 준다.★ 브라우저가 목록을 비동기로 채우기 때문이다
+// (실측 2026-08-10 Chrome: 첫 호출 0개 → 0.6초 뒤 199개).
+//
+// 빈 목록으로 고르면 `utterance.voice` 가 안 잡히고 ★브라우저 기본 목소리★ 가 읽는다. 그 기본값은 OS 언어를
+// 따라가서 한국어 음성인 경우가 많다(실측: `유나`, ko-KR). `utterance.lang = 'en-US'` 를 줘도 voice 가 비면
+// 한국어 엔진이 영어 단어를 읽어 발음이 뭉개진다 — ★"첫 번째만 이상하고 두 번째부터 정상"★ 의 정체다.
+// 두 번째가 멀쩡한 이유는 그 사이 목록이 채워져 `Google US English` 가 잡히기 때문이다.
+const VOICE_WAIT_MS = 1000;
+
+export function findEnglishVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
+  return (
+    voices.find((v) => v.lang.startsWith('en') && v.name.includes('Google')) ??
+    voices.find((v) => v.lang.startsWith('en-US') && !v.localService) ??
+    null
+  );
+}
+
+// ★결과를 캐시하지 않는다.★ 빈 목록으로 한 번 확정해버리면 그 뒤로 영영 기본 목소리가 된다.
+//   매번 현재 목록을 먼저 보고, 비었을 때만 기다린다.
+function waitForVoices(): Promise<SpeechSynthesisVoice[]> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      speechSynthesis.removeEventListener('voiceschanged', finish);
+      resolve(speechSynthesis.getVoices());
+    };
+    speechSynthesis.addEventListener('voiceschanged', finish);
+    // `voiceschanged` 가 끝내 안 오는 환경이 있다. 그때는 계속 기다리지 말고 있는 것으로 진행한다
+    // (목록이 비면 voice 를 안 잡을 뿐, 소리는 난다).
+    setTimeout(finish, VOICE_WAIT_MS);
+  });
+}
+
+function speakWith(word: string, voice: SpeechSynthesisVoice | null): void {
+  const utterance = new SpeechSynthesisUtterance(word);
+  utterance.lang = 'en-US';
+  utterance.rate = 0.9;
+  if (voice) utterance.voice = voice;
+  speechSynthesis.cancel();
+  speechSynthesis.speak(utterance);
+}
+
+// 목록이 이미 있으면 ★동기로★ 끝낸다 — 클릭 핸들러의 사용자 제스처 문맥을 벗어나지 않기 위해서다.
+// 비어 있는 첫 판에서만 기다렸다가 말한다.
+export function speakWord(word: string): void {
+  const ready = speechSynthesis.getVoices();
+  if (ready.length > 0) {
+    speakWith(word, findEnglishVoice(ready));
+    return;
+  }
+  void waitForVoices().then((voices) => speakWith(word, findEnglishVoice(voices)));
+}
+
+// 팝업이 뜨는 시점에 목록 로딩을 깨워둔다. 클릭할 때쯤이면 대개 채워져 있어 기다림이 0 이 된다.
+function warmUpVoices(): void {
+  speechSynthesis.getVoices();
+}
+
 let host: HTMLDivElement | null = null;
 let shadowRoot: ShadowRoot | null = null;
 let triggerEl: HTMLButtonElement | null = null;
@@ -115,6 +176,9 @@ function showTrigger(clientX: number, clientY: number, clientY2?: number): void 
   clientY2 = clientY2 ?? clientY;
   removeTrigger();
   removePopup();
+
+  // 발음 버튼을 누르기 한참 전에 목소리 목록 로딩을 깨워둔다 — 첫 클릭이 기다리지 않게 한다.
+  warmUpVoices();
 
   const root = ensureShadowRoot();
 
@@ -287,17 +351,7 @@ function setPopupWordResult(raw: string, originalWord: string): void {
   speakBtn.innerHTML = SPEAK_ICON;
   speakBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    const utterance = new SpeechSynthesisUtterance(originalWord);
-    utterance.lang = 'en-US';
-    utterance.rate = 0.9;
-    // Prefer high-quality Google voice over default
-    const voices = speechSynthesis.getVoices();
-    const preferred =
-      voices.find((v) => v.lang.startsWith('en') && v.name.includes('Google')) ??
-      voices.find((v) => v.lang.startsWith('en-US') && !v.localService);
-    if (preferred) utterance.voice = preferred;
-    speechSynthesis.cancel();
-    speechSynthesis.speak(utterance);
+    speakWord(originalWord);
   });
 
   header.appendChild(headerText);
