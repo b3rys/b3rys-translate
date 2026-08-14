@@ -90,6 +90,10 @@ function finishSpeaking(requestId: number): void {
 }
 
 export function stopSpeaking(): void {
+  if (speakState !== 'speaking') {
+    resetSpeakingUi();
+    return;
+  }
   speakRequestId += 1;
   if (typeof speechSynthesis !== 'undefined') speechSynthesis.cancel();
   resetSpeakingUi();

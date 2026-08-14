@@ -284,6 +284,14 @@ describe('speakWord — 목록이 비어 있는 첫 재생', () => {
     expect(button.classList.contains('speaking')).toBe(false);
   });
 
+  it('말하지 않은 상태에서 팝업을 닫아도 페이지 음성을 취소하지 않는다', () => {
+    initSelectionPopup();
+
+    destroySelectionPopup();
+
+    expect(cancel).not.toHaveBeenCalled();
+  });
+
   it('★목록이 비면 즉시 말하지 않는다★ — 그대로 말하면 기본(한국어) 목소리로 나간다', () => {
     speakWord('annum');
     expect(spoken).toHaveLength(0);
