@@ -20,6 +20,7 @@ export const VIEWPORT_BATCH_SIZE = 5;
 // (150 calls/min); for normal pages total calls stay well under that.
 export const PIPELINE_CONCURRENCY = 6;
 export const MAX_TEXT_LENGTH = 5000;
+export const SELECTION_MAX_CHARS = 500;
 export const DEBOUNCE_DELAY = 500;
 export const MAX_RETRIES = 3;
 export const RETRY_DELAY_BASE = 1000;

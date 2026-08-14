@@ -3,6 +3,7 @@ import {
   LANGUAGES,
   LANG_STORAGE_KEY,
   DEFAULT_SOURCE_LANG,
+  SELECTION_MAX_CHARS,
   type LanguageCode,
 } from '@/utils/constants';
 import css from './selection-popup.css?raw';
@@ -137,6 +138,10 @@ export function isLikelyEnglish(text: string): boolean {
 
 export function hasMinLength(text: string): boolean {
   return text.trim().length >= 2;
+}
+
+export function isWithinMaxLength(text: string): boolean {
+  return text.trim().length <= SELECTION_MAX_CHARS;
 }
 
 export function isSingleWord(text: string): boolean {
@@ -582,6 +587,7 @@ function onMouseUp(e: MouseEvent): void {
     const text = selection.toString().trim();
     if (!text) return;
     if (!hasMinLength(text)) return;
+    if (!isWithinMaxLength(text)) return;
     if (!isLikelyEnglish(text)) return;
 
     // Position at the right end of the last line of the selection

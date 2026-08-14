@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   isLikelyEnglish,
   hasMinLength,
+  isWithinMaxLength,
   isSingleWord,
   clamp,
   splitSentences,
@@ -11,6 +12,8 @@ import {
   speakWord,
   parseSentenceResponse,
   calculatePopupPlacement,
+  initSelectionPopup,
+  destroySelectionPopup,
 } from '@/entrypoints/content/selection-popup';
 
 describe('isLikelyEnglish', () => {
@@ -50,6 +53,48 @@ describe('hasMinLength', () => {
   it('trims whitespace', () => {
     expect(hasMinLength('  a  ')).toBe(false);
     expect(hasMinLength('  ab  ')).toBe(true);
+  });
+});
+
+describe('isWithinMaxLength', () => {
+  it('allows selections up to and including 500 characters', () => {
+    expect(isWithinMaxLength('a'.repeat(499))).toBe(true);
+    expect(isWithinMaxLength('a'.repeat(500))).toBe(true);
+  });
+
+  it('blocks selections longer than 500 characters', () => {
+    expect(isWithinMaxLength('a'.repeat(501))).toBe(false);
+  });
+
+  it('measures the trimmed selection text', () => {
+    expect(isWithinMaxLength(`${' '.repeat(600)}${'a'.repeat(500)}${' '.repeat(600)}`)).toBe(true);
+  });
+});
+
+describe('selection length guard', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    destroySelectionPopup();
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  it('returns before reading selection geometry when text exceeds 500 characters', () => {
+    const getRangeAt = vi.fn();
+    vi.spyOn(window, 'getSelection').mockReturnValue({
+      isCollapsed: false,
+      toString: () => 'a'.repeat(501),
+      getRangeAt,
+    } as unknown as Selection);
+
+    initSelectionPopup();
+    document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+    vi.runAllTimers();
+
+    expect(getRangeAt).not.toHaveBeenCalled();
   });
 });
 
