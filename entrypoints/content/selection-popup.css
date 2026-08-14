@@ -89,16 +89,16 @@
 
 .b3rys-sel-text {
   color: #e5e5e5;
-  font-size: 15px;
-  line-height: 1.7;
+  font-size: 14px;
+  line-height: 1.6;
   word-break: break-word;
   white-space: pre-wrap;
   letter-spacing: -0.01em;
 }
 
 .b3rys-sel-original {
-  color: #9ca3af;
-  font-size: 12px;
+  color: #b8bfc9;
+  font-size: 13px;
   line-height: 1.5;
   word-break: break-word;
   white-space: pre-wrap;
