@@ -379,6 +379,19 @@ describe('speakWord — 목록이 비어 있는 첫 재생', () => {
     expect(spoken).toHaveLength(1);
   });
 
+  it('팝업을 닫으면 재생을 멈추고 버튼 상태를 해제한다', () => {
+    voices = [GOOGLE];
+    const button = document.createElement('button');
+    initSelectionPopup();
+    speakWord('annum', button);
+    cancel.mockClear();
+
+    destroySelectionPopup();
+
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(button.classList.contains('speaking')).toBe(false);
+  });
+
   it('★목록이 비면 즉시 말하지 않는다★ — 그대로 말하면 기본(한국어) 목소리로 나간다', () => {
     speakWord('annum');
     expect(spoken).toHaveLength(0);
