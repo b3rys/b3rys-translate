@@ -150,11 +150,23 @@ Here are the notes:
   it('설명이 없어도 번역을 반환한다', () => {
     expect(parseSentenceResponse('[1] 번역문')).toEqual({ translation: '번역문', notes: [] });
   });
+
+  it('첫 설명 전의 여러 줄 번역을 모두 보존한다', () => {
+    const raw = `[1] 첫 번째 문단 번역입니다.
+
+두 번째 문단 번역입니다.
+※ matter | 문맥에서는 중요하다`;
+
+    expect(parseSentenceResponse(raw)).toEqual({
+      translation: '첫 번째 문단 번역입니다.\n두 번째 문단 번역입니다.',
+      notes: ['matter | 문맥에서는 중요하다'],
+    });
+  });
 });
 
 describe('calculatePopupPlacement', () => {
   it('아래 공간이 충분하면 선택 영역 아래에 둔다', () => {
-    expect(calculatePopupPlacement(100, 200, 800)).toEqual({
+    expect(calculatePopupPlacement(100, 80, 200, 800)).toEqual({
       top: 108,
       maxHeight: null,
       side: 'below',
@@ -162,19 +174,23 @@ describe('calculatePopupPlacement', () => {
   });
 
   it('아래가 넘치고 위가 충분하면 위로 뒤집는다', () => {
-    expect(calculatePopupPlacement(700, 200, 800)).toEqual({
-      top: 492,
+    expect(calculatePopupPlacement(700, 650, 200, 800)).toEqual({
+      top: 442,
       maxHeight: null,
       side: 'above',
     });
   });
 
   it('위아래 모두 부족하면 더 넓은 쪽에서 높이를 제한한다', () => {
-    expect(calculatePopupPlacement(300, 500, 600)).toEqual({
+    expect(calculatePopupPlacement(300, 280, 500, 600)).toEqual({
       top: 308,
       maxHeight: 284,
       side: 'below',
     });
+  });
+
+  it('위로 뒤집을 때 트리거가 아닌 선택 영역 top을 기준으로 한다', () => {
+    expect(calculatePopupPlacement(700, 620, 200, 800).top).toBe(412);
   });
 });
 

@@ -99,7 +99,8 @@ let shadowRoot: ShadowRoot | null = null;
 let triggerEl: HTMLButtonElement | null = null;
 let popupEl: HTMLDivElement | null = null;
 let popupAnchorX = 0;
-let popupAnchorY = 0;
+let popupAnchorBottom = 0;
+let popupSelectionTop = 0;
 let popupOriginX = 0;
 let popupOriginY = 0;
 
@@ -199,7 +200,12 @@ function showTrigger(clientX: number, clientY: number, clientY2?: number): void 
   root.appendChild(triggerEl);
 }
 
-function showPopup(anchorX: number, anchorY: number, compact = false): void {
+function showPopup(
+  anchorX: number,
+  anchorBottom: number,
+  selectionTop: number,
+  compact = false,
+): void {
   removePopup();
 
   const root = ensureShadowRoot();
@@ -213,7 +219,8 @@ function showPopup(anchorX: number, anchorY: number, compact = false): void {
 
   const popupWidth = compact ? 320 : 440;
   popupAnchorX = anchorX;
-  popupAnchorY = anchorY;
+  popupAnchorBottom = anchorBottom;
+  popupSelectionTop = selectionTop;
 
   // Measure containing-block origin so position works on any site
   popupEl.style.left = '0px';
@@ -239,25 +246,26 @@ export interface PopupPlacement {
 }
 
 export function calculatePopupPlacement(
-  anchorY: number,
+  anchorBottom: number,
+  selectionTop: number,
   popupHeight: number,
   viewportHeight: number,
   margin = 8,
   gap = 8,
 ): PopupPlacement {
-  const belowSpace = Math.max(0, viewportHeight - anchorY - gap - margin);
-  const aboveSpace = Math.max(0, anchorY - gap - margin);
+  const belowSpace = Math.max(0, viewportHeight - anchorBottom - gap - margin);
+  const aboveSpace = Math.max(0, selectionTop - gap - margin);
 
   if (popupHeight <= belowSpace) {
-    return { top: anchorY + gap, maxHeight: null, side: 'below' };
+    return { top: anchorBottom + gap, maxHeight: null, side: 'below' };
   }
   if (popupHeight <= aboveSpace) {
-    return { top: anchorY - gap - popupHeight, maxHeight: null, side: 'above' };
+    return { top: selectionTop - gap - popupHeight, maxHeight: null, side: 'above' };
   }
   const side = belowSpace >= aboveSpace ? 'below' : 'above';
   const maxHeight = side === 'below' ? belowSpace : aboveSpace;
   return {
-    top: side === 'below' ? anchorY + gap : margin,
+    top: side === 'below' ? anchorBottom + gap : margin,
     maxHeight,
     side,
   };
@@ -267,7 +275,12 @@ function positionPopup(): void {
   if (!popupEl) return;
 
   popupEl.style.maxHeight = 'none';
-  const placement = calculatePopupPlacement(popupAnchorY, popupEl.scrollHeight, window.innerHeight);
+  const placement = calculatePopupPlacement(
+    popupAnchorBottom,
+    popupSelectionTop,
+    popupEl.scrollHeight,
+    window.innerHeight,
+  );
   const popupWidth = popupEl.classList.contains('compact') ? 320 : 440;
   const targetVX = clamp(popupAnchorX - popupWidth / 2, 8, window.innerWidth - popupWidth - 8);
 
@@ -298,9 +311,16 @@ export function parseSentenceResponse(raw: string): { translation: string; notes
   const firstContent = lines.findIndex((line) => line.length > 0);
   if (firstContent === -1) return { translation: '', notes: [] };
 
-  const translation = lines[firstContent].replace(/^\[\d+\]\s*/, '').trim();
+  const firstNote = lines.findIndex((line, index) => index > firstContent && line.startsWith('※'));
+  const translationEnd = firstNote === -1 ? lines.length : firstNote;
+  const translation = lines
+    .slice(firstContent, translationEnd)
+    .filter((line) => line.length > 0 && !/^here are (?:the )?notes:?$/i.test(line))
+    .join('\n')
+    .replace(/^\[\d+\]\s*/, '')
+    .trim();
   const notes = lines
-    .slice(firstContent + 1)
+    .slice(translationEnd)
     .filter((line) => line.startsWith('※'))
     .map((line) => line.slice(1).trim())
     .filter(Boolean);
@@ -586,7 +606,7 @@ function onMouseUp(e: MouseEvent): void {
           const anchorY = triggerRect.bottom;
 
           removeTrigger();
-          showPopup(anchorX, anchorY, wordMode);
+          showPopup(anchorX, anchorY, lastRect.top, wordMode);
           translateSelection(text, wordMode);
         },
         { once: true },

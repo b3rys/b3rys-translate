@@ -53,6 +53,14 @@ describe('buildSentenceTranslationPrompt', () => {
     expect(result).toContain('※ expression |');
     expect(result).toContain('Do not list grammar terminology');
   });
+
+  it('학습자 언어를 목표 언어에 맞춘다', () => {
+    const result = buildSentenceTranslationPrompt([{ id: 's1', text: 'There is room.' }], {
+      targetLang: 'ja',
+    });
+    expect(result).toContain('Japanese speakers');
+    expect(result).not.toContain('Korean learners');
+  });
 });
 
 describe('buildWordTranslationPrompt', () => {
