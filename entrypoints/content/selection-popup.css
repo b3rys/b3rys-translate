@@ -96,51 +96,11 @@
   letter-spacing: -0.01em;
 }
 
-.b3rys-sel-original {
-  color: #b8bfc9;
-  font-size: 13px;
-  line-height: 1.5;
-  word-break: break-word;
-  white-space: pre-wrap;
-}
-
 .b3rys-sel-sentence-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 8px;
-}
-
-.b3rys-sel-sentence-notes {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-}
-
-.b3rys-sel-sentence-note {
-  display: flex;
-  gap: 8px;
-  font-size: 12px;
-  line-height: 1.5;
-}
-
-.b3rys-sel-note-word {
-  color: #7ee787;
-  flex-shrink: 0;
-}
-
-.b3rys-sel-note-meaning {
-  color: #9ca3af;
-}
-
-/* Sentence-separated display for long translations */
-.b3rys-sel-sentence {
-  display: block;
-  margin-bottom: 6px;
-}
-
-.b3rys-sel-sentence:last-child {
-  margin-bottom: 0;
 }
 
 .b3rys-sel-actions {

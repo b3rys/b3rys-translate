@@ -5,7 +5,6 @@ import {
   isWithinMaxLength,
   isSingleWord,
   clamp,
-  splitSentences,
   parseWordResponse,
   highlightWord,
   findEnglishVoice,
@@ -128,28 +127,6 @@ describe('clamp', () => {
   });
 });
 
-describe('splitSentences', () => {
-  it('splits on period + space', () => {
-    const result = splitSentences('First sentence. Second sentence.');
-    expect(result).toEqual(['First sentence.', 'Second sentence.']);
-  });
-
-  it('splits on question mark + space', () => {
-    const result = splitSentences('How are you? I am fine.');
-    expect(result).toEqual(['How are you?', 'I am fine.']);
-  });
-
-  it('returns single element for text without breaks', () => {
-    const result = splitSentences('just one sentence');
-    expect(result).toEqual(['just one sentence']);
-  });
-
-  it('filters empty segments', () => {
-    const result = splitSentences('Hello.  ');
-    expect(result.every((s) => s.trim().length > 0)).toBe(true);
-  });
-});
-
 describe('parseWordResponse', () => {
   it('parses translation and examples', () => {
     const raw = `알고리즘
@@ -180,62 +157,20 @@ describe('parseWordResponse', () => {
 });
 
 describe('parseSentenceResponse', () => {
-  it('번역과 펼쳐진 설명 줄을 분리한다', () => {
-    const raw = `[1] 결국 중요한 것은 속도가 아니다.
-Here are the notes:
-※ matter | 명사 "문제"가 아니라 동사 "중요하다"
-
-※ room | "방"이 아니라 "여지"
-이 문장은 전반적으로 격식체입니다.`;
-
-    expect(parseSentenceResponse(raw)).toEqual({
-      translation: '결국 중요한 것은 속도가 아니다.',
-      notes: ['matter | 명사 "문제"가 아니라 동사 "중요하다"', 'room | "방"이 아니라 "여지"'],
-    });
+  it('[N] 접두를 제거해 번역만 반환한다', () => {
+    expect(parseSentenceResponse('[1] 번역문')).toBe('번역문');
   });
 
-  it('설명이 없어도 번역을 반환한다', () => {
-    expect(parseSentenceResponse('[1] 번역문')).toEqual({ translation: '번역문', notes: [] });
-  });
-
-  it('첫 설명 전의 여러 줄 번역을 모두 보존한다', () => {
+  it('여러 줄 번역을 모두 보존한다', () => {
     const raw = `[1] 첫 번째 문단 번역입니다.
 
-두 번째 문단 번역입니다.
-※ matter | 문맥에서는 중요하다`;
+두 번째 문단 번역입니다.`;
 
-    expect(parseSentenceResponse(raw)).toEqual({
-      translation: '첫 번째 문단 번역입니다.\n두 번째 문단 번역입니다.',
-      notes: ['matter | 문맥에서는 중요하다'],
-    });
+    expect(parseSentenceResponse(raw)).toBe('첫 번째 문단 번역입니다.\n두 번째 문단 번역입니다.');
   });
 
-  it('단어가 없으면 빈 영역으로 파싱한다', () => {
-    expect(parseSentenceResponse('[1] 번역만 있습니다.').notes).toEqual([]);
-  });
-
-  it('단어 1개를 파싱한다', () => {
-    expect(parseSentenceResponse('[1] 번역\n※ room | 여지').notes).toEqual(['room | 여지']);
-  });
-
-  it('단어 3개를 모두 파싱한다', () => {
-    const raw = '[1] 번역\n※ one | 하나\n※ two | 둘\n※ three | 셋';
-    expect(parseSentenceResponse(raw).notes).toEqual(['one | 하나', 'two | 둘', 'three | 셋']);
-  });
-
-  it('단어가 4개 이상이면 3개로 자른다', () => {
-    const raw = '[1] 번역\n※ one | 하나\n※ two | 둘\n※ three | 셋\n※ four | 넷';
-    expect(parseSentenceResponse(raw).notes).toHaveLength(3);
-    expect(parseSentenceResponse(raw).notes).not.toContain('four | 넷');
-  });
-
-  it('번역과 단어에서 마크다운 별표를 제거한다', () => {
-    expect(
-      parseSentenceResponse('[1] **번역**\n※ **Getting there** | **점점 나아지는 중**'),
-    ).toEqual({
-      translation: '번역',
-      notes: ['Getting there | 점점 나아지는 중'],
-    });
+  it('번역에서 마크다운 별표를 제거한다', () => {
+    expect(parseSentenceResponse('[1] **번역**')).toBe('번역');
   });
 });
 

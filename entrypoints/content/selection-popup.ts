@@ -343,43 +343,21 @@ function setPopupLoading(): void {
   positionPopup();
 }
 
-/**
- * Split Korean translated text into sentences for readability.
- * Splits on sentence-ending punctuation (. ! ? 다. 요. 음. 임.) followed by a space.
- */
-export function splitSentences(text: string): string[] {
-  // Split on sentence boundaries: period/exclamation/question + space, or Korean endings
-  const parts = text.split(/(?<=[.!?])\s+/);
-  return parts.filter((s) => s.trim().length > 0);
-}
-
-export function parseSentenceResponse(raw: string): { translation: string; notes: string[] } {
-  const lines = raw.split('\n').map((line) => line.trim());
-  const firstContent = lines.findIndex((line) => line.length > 0);
-  if (firstContent === -1) return { translation: '', notes: [] };
-
-  const firstNote = lines.findIndex((line, index) => index > firstContent && line.startsWith('※'));
-  const translationEnd = firstNote === -1 ? lines.length : firstNote;
-  const translation = lines
-    .slice(firstContent, translationEnd)
-    .filter((line) => line.length > 0 && !/^here are (?:the )?notes:?$/i.test(line))
+export function parseSentenceResponse(raw: string): string {
+  return raw
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
     .join('\n')
     .replace(/^\[\d+\]\s*/, '')
     .replace(/\*\*/g, '')
     .trim();
-  const notes = lines
-    .slice(translationEnd)
-    .filter((line) => line.startsWith('※'))
-    .map((line) => line.slice(1).replace(/\*\*/g, '').trim())
-    .filter(Boolean)
-    .slice(0, 3);
-  return { translation, notes };
 }
 
 function setPopupResult(raw: string, originalText: string): void {
   const inner = popupEl?.querySelector('.b3rys-sel-popup-inner');
   if (!inner) return;
-  const { translation, notes } = parseSentenceResponse(raw);
+  const translation = parseSentenceResponse(raw);
 
   const result = document.createElement('div');
   result.className = 'b3rys-sel-result';
@@ -387,25 +365,9 @@ function setPopupResult(raw: string, originalText: string): void {
   const header = document.createElement('div');
   header.className = 'b3rys-sel-sentence-header';
 
-  const originalEl = document.createElement('div');
-  originalEl.className = 'b3rys-sel-original';
-  originalEl.textContent = originalText;
-
   const textEl = document.createElement('div');
   textEl.className = 'b3rys-sel-text';
-
-  // Break long translations into separate lines per sentence
-  const sentences = splitSentences(translation);
-  if (sentences.length > 1) {
-    for (const sentence of sentences) {
-      const sentenceEl = document.createElement('span');
-      sentenceEl.className = 'b3rys-sel-sentence';
-      sentenceEl.textContent = sentence;
-      textEl.appendChild(sentenceEl);
-    }
-  } else {
-    textEl.textContent = translation;
-  }
+  textEl.textContent = translation;
 
   const speakBtn = document.createElement('button');
   speakBtn.className = 'b3rys-sel-speak';
@@ -415,7 +377,7 @@ function setPopupResult(raw: string, originalText: string): void {
     speakWord(originalText, speakBtn);
   });
 
-  header.appendChild(originalEl);
+  header.appendChild(textEl);
   header.appendChild(speakBtn);
 
   const actions = document.createElement('div');
@@ -439,30 +401,6 @@ function setPopupResult(raw: string, originalText: string): void {
 
   actions.appendChild(copyBtn);
   result.appendChild(header);
-  result.appendChild(textEl);
-  if (notes.length > 0) {
-    const sep = document.createElement('div');
-    sep.className = 'b3rys-sel-separator';
-    result.appendChild(sep);
-
-    const notesEl = document.createElement('div');
-    notesEl.className = 'b3rys-sel-sentence-notes';
-    for (const note of notes) {
-      const noteEl = document.createElement('div');
-      noteEl.className = 'b3rys-sel-sentence-note';
-      const [word, ...meaningParts] = note.split('|');
-      const wordEl = document.createElement('span');
-      wordEl.className = 'b3rys-sel-note-word';
-      wordEl.textContent = word.trim();
-      const meaningEl = document.createElement('span');
-      meaningEl.className = 'b3rys-sel-note-meaning';
-      meaningEl.textContent = meaningParts.join('|').trim();
-      noteEl.appendChild(wordEl);
-      if (meaningEl.textContent) noteEl.appendChild(meaningEl);
-      notesEl.appendChild(noteEl);
-    }
-    result.appendChild(notesEl);
-  }
   result.appendChild(actions);
 
   inner.innerHTML = '';

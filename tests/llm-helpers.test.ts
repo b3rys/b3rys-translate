@@ -46,21 +46,20 @@ Do not add explanations or notes.
 });
 
 describe('buildSentenceTranslationPrompt', () => {
-  it('한 호출에서 번역과 최대 3개의 짧은 단어 뜻을 요구한다', () => {
+  it('설명 없이 번역만 요구한다', () => {
     const result = buildSentenceTranslationPrompt([{ id: 's1', text: 'There is room.' }]);
     expect(result).toContain('[1] There is room.');
-    expect(result).toContain('Up to three difficult English words');
-    expect(result).toContain('※ difficult word | short Korean meaning');
-    expect(result).toContain('Omit the word section entirely');
-    expect(result).toContain('Do not use markdown or asterisks anywhere');
+    expect(result).toContain('Translate each numbered sentence or paragraph below into Korean');
+    expect(result).toContain('Do not add explanations or notes');
+    expect(result).not.toContain('※');
   });
 
-  it('학습자 언어를 목표 언어에 맞춘다', () => {
+  it('번역 언어를 목표 언어에 맞춘다', () => {
     const result = buildSentenceTranslationPrompt([{ id: 's1', text: 'There is room.' }], {
       targetLang: 'ja',
     });
-    expect(result).toContain('short Japanese meaning');
-    expect(result).not.toContain('short Korean meaning');
+    expect(result).toContain('into Japanese');
+    expect(result).not.toContain('into Korean');
   });
 });
 

@@ -67,17 +67,10 @@ export function buildSentenceTranslationPrompt(
   const tgt = tgtName(lang ?? {});
   const numbered = paragraphs.map((p, i) => `[${i + 1}] ${p.text}`).join('\n\n');
 
-  return `You are a professional translator and language-learning guide. For each numbered sentence or paragraph below, provide:
-1. A natural ${tgt} translation
-2. Up to three difficult English words or expressions, each with a short ${tgt} meaning
-
-Omit the word section entirely when there are no difficult words. Keep each meaning to one short phrase. Do not use markdown or asterisks anywhere.
-
-Format:
-[N] ${tgt} translation
-※ difficult word | short ${tgt} meaning
-※ difficult word | short ${tgt} meaning
-※ difficult word | short ${tgt} meaning
+  return `You are a professional translator. Translate each numbered sentence or paragraph below into ${tgt}.
+Return ONLY the ${tgt} translations, each prefixed with its number in the same [N] format.
+Maintain the original meaning, tone, and paragraph structure.
+Do not add explanations or notes.
 
 ${numbered}`;
 }
