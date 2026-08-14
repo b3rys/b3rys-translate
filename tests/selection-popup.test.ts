@@ -9,6 +9,8 @@ import {
   highlightWord,
   findEnglishVoice,
   speakWord,
+  parseSentenceResponse,
+  calculatePopupPlacement,
 } from '@/entrypoints/content/selection-popup';
 
 describe('isLikelyEnglish', () => {
@@ -127,6 +129,49 @@ describe('parseWordResponse', () => {
 • Some example without Korean`;
     const { examples } = parseWordResponse(raw);
     expect(examples).toEqual([]);
+  });
+});
+
+describe('parseSentenceResponse', () => {
+  it('번역과 펼쳐진 설명 줄을 분리한다', () => {
+    const raw = `[1] 결국 중요한 것은 속도가 아니다.
+※ matter | 명사 "문제"가 아니라 동사 "중요하다"
+※ room | "방"이 아니라 "여지"`;
+
+    expect(parseSentenceResponse(raw)).toEqual({
+      translation: '결국 중요한 것은 속도가 아니다.',
+      notes: ['matter | 명사 "문제"가 아니라 동사 "중요하다"', 'room | "방"이 아니라 "여지"'],
+    });
+  });
+
+  it('설명이 없어도 번역을 반환한다', () => {
+    expect(parseSentenceResponse('[1] 번역문')).toEqual({ translation: '번역문', notes: [] });
+  });
+});
+
+describe('calculatePopupPlacement', () => {
+  it('아래 공간이 충분하면 선택 영역 아래에 둔다', () => {
+    expect(calculatePopupPlacement(100, 200, 800)).toEqual({
+      top: 108,
+      maxHeight: null,
+      side: 'below',
+    });
+  });
+
+  it('아래가 넘치고 위가 충분하면 위로 뒤집는다', () => {
+    expect(calculatePopupPlacement(700, 200, 800)).toEqual({
+      top: 492,
+      maxHeight: null,
+      side: 'above',
+    });
+  });
+
+  it('위아래 모두 부족하면 더 넓은 쪽에서 높이를 제한한다', () => {
+    expect(calculatePopupPlacement(300, 500, 600)).toEqual({
+      top: 308,
+      maxHeight: 284,
+      side: 'below',
+    });
   });
 });
 

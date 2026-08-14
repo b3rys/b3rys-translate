@@ -5,6 +5,7 @@ import {
   buildTranslationPrompt,
   buildSubtitleTranslationPrompt,
   buildWordTranslationPrompt,
+  buildSentenceTranslationPrompt,
   buildSegmentationPrompt,
   parseTranslationResponse,
   callWithRetry,
@@ -80,9 +81,11 @@ export const anthropicEngine: TranslationEngine = {
     const prompt =
       mode === 'word'
         ? buildWordTranslationPrompt(paragraphs, lang)
-        : mode === 'subtitle'
-          ? buildSubtitleTranslationPrompt(paragraphs, subtitleContext, lang)
-          : buildTranslationPrompt(paragraphs, lang);
+        : mode === 'sentence'
+          ? buildSentenceTranslationPrompt(paragraphs, lang)
+          : mode === 'subtitle'
+            ? buildSubtitleTranslationPrompt(paragraphs, subtitleContext, lang)
+            : buildTranslationPrompt(paragraphs, lang);
 
     const response = await callWithRetry(() =>
       fetch(ENGINE_ENDPOINTS.anthropic, {

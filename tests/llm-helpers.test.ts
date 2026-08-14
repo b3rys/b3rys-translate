@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   buildTranslationPrompt,
   buildWordTranslationPrompt,
+  buildSentenceTranslationPrompt,
   buildSubtitleTranslationPrompt,
   buildSegmentationPrompt,
   parseTranslationResponse,
@@ -9,6 +10,17 @@ import {
 } from '@/utils/engines/llm-helpers';
 
 describe('buildTranslationPrompt', () => {
+  it('page 프롬프트를 글자 단위로 유지한다', () => {
+    expect(buildTranslationPrompt([{ id: 'a', text: 'Hello world' }])).toBe(
+      `You are a professional translator. Translate each numbered paragraph below into Korean.
+Return ONLY the Korean translations, each prefixed with its number in the same [N] format.
+Maintain the original meaning, tone, and paragraph structure.
+Preserve all HTML tags (<a>, <code>, <strong>, <em>, etc.) exactly as they appear. Only translate the text content within them, not the tags or their attributes.
+Do not add explanations or notes.
+
+[1] Hello world`,
+    );
+  });
   it('formats paragraphs with numbered markers', () => {
     const result = buildTranslationPrompt([
       { id: 'a', text: 'Hello world' },
@@ -30,6 +42,16 @@ describe('buildTranslationPrompt', () => {
     const result = buildTranslationPrompt([]);
     expect(result).toContain('into Korean');
     // Should not crash
+  });
+});
+
+describe('buildSentenceTranslationPrompt', () => {
+  it('한 호출에서 번역과 한국인 학습자용 설명을 요구한다', () => {
+    const result = buildSentenceTranslationPrompt([{ id: 's1', text: 'There is room.' }]);
+    expect(result).toContain('[1] There is room.');
+    expect(result).toContain('Three or four brief learning notes');
+    expect(result).toContain('※ expression |');
+    expect(result).toContain('Do not list grammar terminology');
   });
 });
 

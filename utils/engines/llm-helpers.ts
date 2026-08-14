@@ -60,6 +60,28 @@ Format:
 ${numbered}`;
 }
 
+export function buildSentenceTranslationPrompt(
+  paragraphs: { id: string; text: string }[],
+  lang?: LangPair,
+): string {
+  const tgt = tgtName(lang ?? {});
+  const numbered = paragraphs.map((p, i) => `[${i + 1}] ${p.text}`).join('\n\n');
+
+  return `You are a professional translator and language-learning guide. For each numbered sentence or paragraph below, provide:
+1. A natural ${tgt} translation
+2. Three or four brief learning notes about expressions that Korean learners are likely to misunderstand
+
+Focus each note on the contrast between a tempting literal or familiar meaning and the meaning used in this context. Do not list grammar terminology or give a general grammar lecture. Keep each note concise.
+
+Format:
+[N] ${tgt} translation
+※ expression | contextual meaning or contrast explained in ${tgt}
+※ expression | contextual meaning or contrast explained in ${tgt}
+※ expression | contextual meaning or contrast explained in ${tgt}
+
+${numbered}`;
+}
+
 export function buildSubtitleTranslationPrompt(
   paragraphs: { id: string; text: string }[],
   context?: { original: string; translated: string }[],

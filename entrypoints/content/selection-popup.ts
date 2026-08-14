@@ -98,6 +98,10 @@ let host: HTMLDivElement | null = null;
 let shadowRoot: ShadowRoot | null = null;
 let triggerEl: HTMLButtonElement | null = null;
 let popupEl: HTMLDivElement | null = null;
+let popupAnchorX = 0;
+let popupAnchorY = 0;
+let popupOriginX = 0;
+let popupOriginY = 0;
 
 let selectionSourceScript: 'latin' | 'cjk' | 'cyrillic' = 'latin';
 
@@ -208,6 +212,8 @@ function showPopup(anchorX: number, anchorY: number, compact = false): void {
   popupEl.appendChild(inner);
 
   const popupWidth = compact ? 320 : 440;
+  popupAnchorX = anchorX;
+  popupAnchorY = anchorY;
 
   // Measure containing-block origin so position works on any site
   popupEl.style.left = '0px';
@@ -216,20 +222,65 @@ function showPopup(anchorX: number, anchorY: number, compact = false): void {
   root.appendChild(popupEl);
 
   const origin = popupEl.getBoundingClientRect();
+  popupOriginX = origin.left;
+  popupOriginY = origin.top;
 
   // Target viewport position → adjust by containing-block offset
   const targetVX = clamp(anchorX - popupWidth / 2, 8, window.innerWidth - popupWidth - 8);
-  const targetVY = anchorY + 8;
-
   popupEl.style.left = `${targetVX - origin.left}px`;
-  popupEl.style.top = `${targetVY - origin.top}px`;
   popupEl.style.visibility = '';
+  positionPopup();
+}
+
+export interface PopupPlacement {
+  top: number;
+  maxHeight: number | null;
+  side: 'above' | 'below';
+}
+
+export function calculatePopupPlacement(
+  anchorY: number,
+  popupHeight: number,
+  viewportHeight: number,
+  margin = 8,
+  gap = 8,
+): PopupPlacement {
+  const belowSpace = Math.max(0, viewportHeight - anchorY - gap - margin);
+  const aboveSpace = Math.max(0, anchorY - gap - margin);
+
+  if (popupHeight <= belowSpace) {
+    return { top: anchorY + gap, maxHeight: null, side: 'below' };
+  }
+  if (popupHeight <= aboveSpace) {
+    return { top: anchorY - gap - popupHeight, maxHeight: null, side: 'above' };
+  }
+  const side = belowSpace >= aboveSpace ? 'below' : 'above';
+  const maxHeight = side === 'below' ? belowSpace : aboveSpace;
+  return {
+    top: side === 'below' ? anchorY + gap : margin,
+    maxHeight,
+    side,
+  };
+}
+
+function positionPopup(): void {
+  if (!popupEl) return;
+
+  popupEl.style.maxHeight = 'none';
+  const placement = calculatePopupPlacement(popupAnchorY, popupEl.scrollHeight, window.innerHeight);
+  const popupWidth = popupEl.classList.contains('compact') ? 320 : 440;
+  const targetVX = clamp(popupAnchorX - popupWidth / 2, 8, window.innerWidth - popupWidth - 8);
+
+  popupEl.style.left = `${targetVX - popupOriginX}px`;
+  popupEl.style.top = `${placement.top - popupOriginY}px`;
+  popupEl.style.maxHeight = placement.maxHeight === null ? '' : `${placement.maxHeight}px`;
 }
 
 function setPopupLoading(): void {
   const inner = popupEl?.querySelector('.b3rys-sel-popup-inner');
   if (!inner) return;
   inner.innerHTML = `<div class="b3rys-sel-loading">${SPINNER_SVG}<span>번역 중...</span></div>`;
+  positionPopup();
 }
 
 /**
@@ -242,25 +293,54 @@ export function splitSentences(text: string): string[] {
   return parts.filter((s) => s.trim().length > 0);
 }
 
-function setPopupResult(text: string): void {
+export function parseSentenceResponse(raw: string): { translation: string; notes: string[] } {
+  const lines = raw.split('\n').map((line) => line.trim());
+  const firstContent = lines.findIndex((line) => line.length > 0);
+  if (firstContent === -1) return { translation: '', notes: [] };
+
+  const translation = lines[firstContent].replace(/^\[\d+\]\s*/, '').trim();
+  const notes = lines
+    .slice(firstContent + 1)
+    .filter((line) => line.startsWith('※'))
+    .map((line) => line.slice(1).trim())
+    .filter(Boolean);
+  return { translation, notes };
+}
+
+function setPopupResult(raw: string, originalText: string): void {
   const inner = popupEl?.querySelector('.b3rys-sel-popup-inner');
   if (!inner) return;
+  const { translation, notes } = parseSentenceResponse(raw);
 
   const result = document.createElement('div');
   result.className = 'b3rys-sel-result';
+
+  const header = document.createElement('div');
+  header.className = 'b3rys-sel-sentence-header';
 
   const textEl = document.createElement('div');
   textEl.className = 'b3rys-sel-text';
 
   // Break long translations into separate lines per sentence
-  const sentences = splitSentences(text);
+  const sentences = splitSentences(translation);
   if (sentences.length > 1) {
     textEl.innerHTML = sentences
       .map((s) => `<span class="b3rys-sel-sentence">${s}</span>`)
       .join('');
   } else {
-    textEl.textContent = text;
+    textEl.textContent = translation;
   }
+
+  const speakBtn = document.createElement('button');
+  speakBtn.className = 'b3rys-sel-speak';
+  speakBtn.innerHTML = SPEAK_ICON;
+  speakBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    speakWord(originalText);
+  });
+
+  header.appendChild(textEl);
+  header.appendChild(speakBtn);
 
   const actions = document.createElement('div');
   actions.className = 'b3rys-sel-actions';
@@ -271,7 +351,7 @@ function setPopupResult(text: string): void {
   copyBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     navigator.clipboard
-      .writeText(text)
+      .writeText(translation)
       .then(() => {
         copyBtn.innerHTML = CHECK_ICON;
         setTimeout(() => {
@@ -282,11 +362,27 @@ function setPopupResult(text: string): void {
   });
 
   actions.appendChild(copyBtn);
-  result.appendChild(textEl);
+  result.appendChild(header);
+  if (notes.length > 0) {
+    const sep = document.createElement('div');
+    sep.className = 'b3rys-sel-separator';
+    result.appendChild(sep);
+
+    const notesEl = document.createElement('div');
+    notesEl.className = 'b3rys-sel-sentence-notes';
+    for (const note of notes) {
+      const noteEl = document.createElement('div');
+      noteEl.className = 'b3rys-sel-sentence-note';
+      noteEl.textContent = note;
+      notesEl.appendChild(noteEl);
+    }
+    result.appendChild(notesEl);
+  }
   result.appendChild(actions);
 
   inner.innerHTML = '';
   inner.appendChild(result);
+  positionPopup();
 }
 
 interface WordExample {
@@ -398,12 +494,14 @@ function setPopupWordResult(raw: string, originalWord: string): void {
 
   inner.innerHTML = '';
   inner.appendChild(result);
+  positionPopup();
 }
 
 function setPopupError(message: string): void {
   const inner = popupEl?.querySelector('.b3rys-sel-popup-inner');
   if (!inner) return;
   inner.innerHTML = `<div class="b3rys-sel-error">${message}</div>`;
+  positionPopup();
 }
 
 async function translateSelection(text: string, wordMode: boolean): Promise<void> {
@@ -413,7 +511,7 @@ async function translateSelection(text: string, wordMode: boolean): Promise<void
     const response: TranslateBatchResponse = await chrome.runtime.sendMessage({
       type: 'TRANSLATE_BATCH',
       paragraphs: [{ id: 'selection-0', text }],
-      mode: wordMode ? 'word' : 'page',
+      mode: wordMode ? 'word' : 'sentence',
     });
 
     // Popup may have been closed while waiting
@@ -437,7 +535,7 @@ async function translateSelection(text: string, wordMode: boolean): Promise<void
       if (wordMode) {
         setPopupWordResult(translated, text);
       } else {
-        setPopupResult(translated);
+        setPopupResult(translated, text);
       }
     } else {
       setPopupError('번역 결과가 없습니다.');
