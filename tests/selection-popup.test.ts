@@ -135,8 +135,11 @@ describe('parseWordResponse', () => {
 describe('parseSentenceResponse', () => {
   it('번역과 펼쳐진 설명 줄을 분리한다', () => {
     const raw = `[1] 결국 중요한 것은 속도가 아니다.
+Here are the notes:
 ※ matter | 명사 "문제"가 아니라 동사 "중요하다"
-※ room | "방"이 아니라 "여지"`;
+
+※ room | "방"이 아니라 "여지"
+이 문장은 전반적으로 격식체입니다.`;
 
     expect(parseSentenceResponse(raw)).toEqual({
       translation: '결국 중요한 것은 속도가 아니다.',
