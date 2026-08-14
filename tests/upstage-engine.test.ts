@@ -74,7 +74,9 @@ describe('Upstage Solar engine', () => {
       expect(result.translations).toEqual([{ id: 'p1', translatedText: '안녕하세요' }]);
       expect(sentBody(mock).messages[0].content).toContain('Hello.');
       if (mode === 'sentence') {
-        expect(sentBody(mock).messages[0].content).toContain('※ expression |');
+        expect(sentBody(mock).messages[0].content).toContain(
+          '※ difficult word | short Korean meaning',
+        );
       }
     },
   );

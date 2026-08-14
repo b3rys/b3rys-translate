@@ -69,15 +69,15 @@ export function buildSentenceTranslationPrompt(
 
   return `You are a professional translator and language-learning guide. For each numbered sentence or paragraph below, provide:
 1. A natural ${tgt} translation
-2. Three or four brief learning notes about expressions that ${tgt} speakers are likely to misunderstand
+2. Up to three difficult English words or expressions, each with a short ${tgt} meaning
 
-Focus each note on the contrast between a tempting literal or familiar meaning and the meaning used in this context. Do not list grammar terminology or give a general grammar lecture. Keep each note concise.
+Omit the word section entirely when there are no difficult words. Keep each meaning to one short phrase. Do not use markdown or asterisks anywhere.
 
 Format:
 [N] ${tgt} translation
-※ expression | contextual meaning or contrast explained in ${tgt}
-※ expression | contextual meaning or contrast explained in ${tgt}
-※ expression | contextual meaning or contrast explained in ${tgt}
+※ difficult word | short ${tgt} meaning
+※ difficult word | short ${tgt} meaning
+※ difficult word | short ${tgt} meaning
 
 ${numbered}`;
 }

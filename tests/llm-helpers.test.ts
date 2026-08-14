@@ -46,20 +46,21 @@ Do not add explanations or notes.
 });
 
 describe('buildSentenceTranslationPrompt', () => {
-  it('한 호출에서 번역과 한국인 학습자용 설명을 요구한다', () => {
+  it('한 호출에서 번역과 최대 3개의 짧은 단어 뜻을 요구한다', () => {
     const result = buildSentenceTranslationPrompt([{ id: 's1', text: 'There is room.' }]);
     expect(result).toContain('[1] There is room.');
-    expect(result).toContain('Three or four brief learning notes');
-    expect(result).toContain('※ expression |');
-    expect(result).toContain('Do not list grammar terminology');
+    expect(result).toContain('Up to three difficult English words');
+    expect(result).toContain('※ difficult word | short Korean meaning');
+    expect(result).toContain('Omit the word section entirely');
+    expect(result).toContain('Do not use markdown or asterisks anywhere');
   });
 
   it('학습자 언어를 목표 언어에 맞춘다', () => {
     const result = buildSentenceTranslationPrompt([{ id: 's1', text: 'There is room.' }], {
       targetLang: 'ja',
     });
-    expect(result).toContain('Japanese speakers');
-    expect(result).not.toContain('Korean learners');
+    expect(result).toContain('short Japanese meaning');
+    expect(result).not.toContain('short Korean meaning');
   });
 });
 

@@ -10,6 +10,8 @@ import {
   highlightWord,
   findEnglishVoice,
   speakWord,
+  stopSpeaking,
+  toggleSpeakState,
   parseSentenceResponse,
   calculatePopupPlacement,
   initSelectionPopup,
@@ -207,6 +209,34 @@ Here are the notes:
       notes: ['matter | 문맥에서는 중요하다'],
     });
   });
+
+  it('단어가 없으면 빈 영역으로 파싱한다', () => {
+    expect(parseSentenceResponse('[1] 번역만 있습니다.').notes).toEqual([]);
+  });
+
+  it('단어 1개를 파싱한다', () => {
+    expect(parseSentenceResponse('[1] 번역\n※ room | 여지').notes).toEqual(['room | 여지']);
+  });
+
+  it('단어 3개를 모두 파싱한다', () => {
+    const raw = '[1] 번역\n※ one | 하나\n※ two | 둘\n※ three | 셋';
+    expect(parseSentenceResponse(raw).notes).toEqual(['one | 하나', 'two | 둘', 'three | 셋']);
+  });
+
+  it('단어가 4개 이상이면 3개로 자른다', () => {
+    const raw = '[1] 번역\n※ one | 하나\n※ two | 둘\n※ three | 셋\n※ four | 넷';
+    expect(parseSentenceResponse(raw).notes).toHaveLength(3);
+    expect(parseSentenceResponse(raw).notes).not.toContain('four | 넷');
+  });
+
+  it('번역과 단어에서 마크다운 별표를 제거한다', () => {
+    expect(
+      parseSentenceResponse('[1] **번역**\n※ **Getting there** | **점점 나아지는 중**'),
+    ).toEqual({
+      translation: '번역',
+      notes: ['Getting there | 점점 나아지는 중'],
+    });
+  });
 });
 
 describe('calculatePopupPlacement', () => {
@@ -302,11 +332,13 @@ describe('speakWord — 목록이 비어 있는 첫 재생', () => {
   let spoken: Array<{ text: string; voice: SpeechSynthesisVoice | null }>;
   let listeners: Array<() => void>;
   let voices: SpeechSynthesisVoice[];
+  let cancel: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     spoken = [];
     listeners = [];
     voices = [];
+    cancel = vi.fn();
     class FakeUtterance {
       voice: SpeechSynthesisVoice | null = null;
       lang = '';
@@ -316,7 +348,7 @@ describe('speakWord — 목록이 비어 있는 첫 재생', () => {
     vi.stubGlobal('SpeechSynthesisUtterance', FakeUtterance);
     vi.stubGlobal('speechSynthesis', {
       getVoices: () => voices,
-      cancel: () => {},
+      cancel,
       speak: (u: { text: string; voice: SpeechSynthesisVoice | null }) =>
         spoken.push({ text: u.text, voice: u.voice }),
       addEventListener: (_: string, fn: () => void) => listeners.push(fn),
@@ -324,7 +356,28 @@ describe('speakWord — 목록이 비어 있는 첫 재생', () => {
     });
   });
 
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => {
+    stopSpeaking();
+    vi.unstubAllGlobals();
+  });
+
+  it('상태를 재생과 정지 사이에서 토글한다', () => {
+    expect(toggleSpeakState('idle')).toBe('speaking');
+    expect(toggleSpeakState('speaking')).toBe('idle');
+  });
+
+  it('재생 중 다시 누르면 정지하고 버튼 상태를 직접 해제한다', () => {
+    voices = [GOOGLE];
+    const button = document.createElement('button');
+
+    speakWord('annum', button);
+    expect(button.classList.contains('speaking')).toBe(true);
+    speakWord('annum', button);
+
+    expect(cancel).toHaveBeenCalled();
+    expect(button.classList.contains('speaking')).toBe(false);
+    expect(spoken).toHaveLength(1);
+  });
 
   it('★목록이 비면 즉시 말하지 않는다★ — 그대로 말하면 기본(한국어) 목소리로 나간다', () => {
     speakWord('annum');

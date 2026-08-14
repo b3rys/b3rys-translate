@@ -88,11 +88,20 @@
 }
 
 .b3rys-sel-text {
-  font-size: 14px;
-  line-height: 1.6;
+  color: #e5e5e5;
+  font-size: 15px;
+  line-height: 1.7;
   word-break: break-word;
   white-space: pre-wrap;
   letter-spacing: -0.01em;
+}
+
+.b3rys-sel-original {
+  color: #9ca3af;
+  font-size: 12px;
+  line-height: 1.5;
+  word-break: break-word;
+  white-space: pre-wrap;
 }
 
 .b3rys-sel-sentence-header {
@@ -109,15 +118,19 @@
 }
 
 .b3rys-sel-sentence-note {
-  color: #9ca3af;
+  display: flex;
+  gap: 8px;
   font-size: 12px;
   line-height: 1.5;
 }
 
-.b3rys-sel-sentence-note::before {
-  content: '※';
+.b3rys-sel-note-word {
   color: #7ee787;
-  margin-right: 6px;
+  flex-shrink: 0;
+}
+
+.b3rys-sel-note-meaning {
+  color: #9ca3af;
 }
 
 /* Sentence-separated display for long translations */
@@ -200,6 +213,11 @@
 .b3rys-sel-speak:hover {
   color: #7ee787;
   background: rgba(126, 231, 135, 0.1);
+}
+
+.b3rys-sel-speak.speaking {
+  color: #7ee787;
+  background: rgba(126, 231, 135, 0.16);
 }
 
 .b3rys-sel-speak svg {

@@ -38,7 +38,7 @@ describe('model-aware engine requests', () => {
     expect(body.model).toBe('gpt-5.6-luna');
     expect(body.reasoning_effort).toBe('none');
     expect(body).not.toHaveProperty('temperature');
-    expect(body.messages[0].content).toContain('※ expression |');
+    expect(body.messages[0].content).toContain('※ difficult word | short Korean meaning');
   });
 
   it('routes Gemini 3.1 Flash Lite through its model endpoint with translation temperature pinned', async () => {
@@ -71,7 +71,7 @@ describe('model-aware engine requests', () => {
     // 번역은 같은 입력에 같은 출력이 나와야 하고 응답이 JSON 이라 형식이 흔들리면
     // 파싱이 깨진다. 모델 선택 기능을 넣으면서 이 값이 사라진 적이 있어 고정한다.
     expect(body.generationConfig.temperature).toBe(0.1);
-    expect(body.contents[0].parts[0].text).toContain('※ expression |');
+    expect(body.contents[0].parts[0].text).toContain('※ difficult word | short Korean meaning');
   });
 
   it('routes Claude Haiku 4.5 through the existing Messages API contract', async () => {
@@ -99,6 +99,6 @@ describe('model-aware engine requests', () => {
     const init = fetchMock.mock.calls[0][1] as RequestInit;
     const body = JSON.parse(init.body as string);
     expect(body.model).toBe('claude-haiku-4-5-20251001');
-    expect(body.messages[0].content).toContain('※ expression |');
+    expect(body.messages[0].content).toContain('※ difficult word | short Korean meaning');
   });
 });

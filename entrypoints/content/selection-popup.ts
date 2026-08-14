@@ -70,24 +70,65 @@ function waitForVoices(): Promise<SpeechSynthesisVoice[]> {
   });
 }
 
-function speakWith(word: string, voice: SpeechSynthesisVoice | null): void {
+export type SpeakState = 'idle' | 'speaking';
+
+export function toggleSpeakState(state: SpeakState): SpeakState {
+  return state === 'speaking' ? 'idle' : 'speaking';
+}
+
+let speakState: SpeakState = 'idle';
+let activeSpeakButton: HTMLButtonElement | null = null;
+let speakRequestId = 0;
+
+function resetSpeakingUi(): void {
+  activeSpeakButton?.classList.remove('speaking');
+  activeSpeakButton = null;
+  speakState = 'idle';
+}
+
+function finishSpeaking(requestId: number): void {
+  if (requestId === speakRequestId) resetSpeakingUi();
+}
+
+export function stopSpeaking(): void {
+  speakRequestId += 1;
+  if (typeof speechSynthesis !== 'undefined') speechSynthesis.cancel();
+  resetSpeakingUi();
+}
+
+function speakWith(word: string, voice: SpeechSynthesisVoice | null, requestId: number): void {
+  if (speakState !== 'speaking' || requestId !== speakRequestId) return;
   const utterance = new SpeechSynthesisUtterance(word);
   utterance.lang = 'en-US';
   utterance.rate = 0.9;
   if (voice) utterance.voice = voice;
+  utterance.onend = () => finishSpeaking(requestId);
+  utterance.onerror = () => finishSpeaking(requestId);
   speechSynthesis.cancel();
   speechSynthesis.speak(utterance);
 }
 
 // 목록이 이미 있으면 ★동기로★ 끝낸다 — 클릭 핸들러의 사용자 제스처 문맥을 벗어나지 않기 위해서다.
 // 비어 있는 첫 판에서만 기다렸다가 말한다.
-export function speakWord(word: string): void {
-  const ready = speechSynthesis.getVoices();
-  if (ready.length > 0) {
-    speakWith(word, findEnglishVoice(ready));
+export function speakWord(word: string, button?: HTMLButtonElement): void {
+  const nextState = toggleSpeakState(speakState);
+  if (nextState === 'idle') {
+    stopSpeaking();
     return;
   }
-  void waitForVoices().then((voices) => speakWith(word, findEnglishVoice(voices)));
+
+  speakState = nextState;
+  activeSpeakButton?.classList.remove('speaking');
+  activeSpeakButton = button ?? null;
+  activeSpeakButton?.classList.add('speaking');
+  const requestId = ++speakRequestId;
+
+  const ready = speechSynthesis.getVoices();
+  if (ready.length > 0) {
+    speakWith(word, findEnglishVoice(ready), requestId);
+    return;
+  }
+  void waitForVoices().then((voices) => speakWith(word, findEnglishVoice(voices), requestId));
 }
 
 // 팝업이 뜨는 시점에 목록 로딩을 깨워둔다. 클릭할 때쯤이면 대개 채워져 있어 기다림이 0 이 된다.
@@ -173,6 +214,7 @@ function removeTrigger(): void {
 }
 
 function removePopup(): void {
+  stopSpeaking();
   popupEl?.remove();
   popupEl = null;
 }
@@ -323,12 +365,14 @@ export function parseSentenceResponse(raw: string): { translation: string; notes
     .filter((line) => line.length > 0 && !/^here are (?:the )?notes:?$/i.test(line))
     .join('\n')
     .replace(/^\[\d+\]\s*/, '')
+    .replace(/\*\*/g, '')
     .trim();
   const notes = lines
     .slice(translationEnd)
     .filter((line) => line.startsWith('※'))
-    .map((line) => line.slice(1).trim())
-    .filter(Boolean);
+    .map((line) => line.slice(1).replace(/\*\*/g, '').trim())
+    .filter(Boolean)
+    .slice(0, 3);
   return { translation, notes };
 }
 
@@ -343,15 +387,22 @@ function setPopupResult(raw: string, originalText: string): void {
   const header = document.createElement('div');
   header.className = 'b3rys-sel-sentence-header';
 
+  const originalEl = document.createElement('div');
+  originalEl.className = 'b3rys-sel-original';
+  originalEl.textContent = originalText;
+
   const textEl = document.createElement('div');
   textEl.className = 'b3rys-sel-text';
 
   // Break long translations into separate lines per sentence
   const sentences = splitSentences(translation);
   if (sentences.length > 1) {
-    textEl.innerHTML = sentences
-      .map((s) => `<span class="b3rys-sel-sentence">${s}</span>`)
-      .join('');
+    for (const sentence of sentences) {
+      const sentenceEl = document.createElement('span');
+      sentenceEl.className = 'b3rys-sel-sentence';
+      sentenceEl.textContent = sentence;
+      textEl.appendChild(sentenceEl);
+    }
   } else {
     textEl.textContent = translation;
   }
@@ -361,10 +412,10 @@ function setPopupResult(raw: string, originalText: string): void {
   speakBtn.innerHTML = SPEAK_ICON;
   speakBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    speakWord(originalText);
+    speakWord(originalText, speakBtn);
   });
 
-  header.appendChild(textEl);
+  header.appendChild(originalEl);
   header.appendChild(speakBtn);
 
   const actions = document.createElement('div');
@@ -388,6 +439,7 @@ function setPopupResult(raw: string, originalText: string): void {
 
   actions.appendChild(copyBtn);
   result.appendChild(header);
+  result.appendChild(textEl);
   if (notes.length > 0) {
     const sep = document.createElement('div');
     sep.className = 'b3rys-sel-separator';
@@ -398,7 +450,15 @@ function setPopupResult(raw: string, originalText: string): void {
     for (const note of notes) {
       const noteEl = document.createElement('div');
       noteEl.className = 'b3rys-sel-sentence-note';
-      noteEl.textContent = note;
+      const [word, ...meaningParts] = note.split('|');
+      const wordEl = document.createElement('span');
+      wordEl.className = 'b3rys-sel-note-word';
+      wordEl.textContent = word.trim();
+      const meaningEl = document.createElement('span');
+      meaningEl.className = 'b3rys-sel-note-meaning';
+      meaningEl.textContent = meaningParts.join('|').trim();
+      noteEl.appendChild(wordEl);
+      if (meaningEl.textContent) noteEl.appendChild(meaningEl);
       notesEl.appendChild(noteEl);
     }
     result.appendChild(notesEl);
@@ -472,7 +532,7 @@ function setPopupWordResult(raw: string, originalWord: string): void {
   speakBtn.innerHTML = SPEAK_ICON;
   speakBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    speakWord(originalWord);
+    speakWord(originalWord, speakBtn);
   });
 
   header.appendChild(headerText);
