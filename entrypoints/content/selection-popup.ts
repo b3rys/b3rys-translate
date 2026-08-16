@@ -148,6 +148,16 @@ let popupAnchorBottom = 0;
 let popupSelectionTop = 0;
 let popupOriginX = 0;
 let popupOriginY = 0;
+let popupWasDragged = false;
+
+interface PopupDragState {
+  startClientX: number;
+  startClientY: number;
+  startPopupX: number;
+  startPopupY: number;
+}
+
+let popupDragState: PopupDragState | null = null;
 
 let selectionSourceScript: 'latin' | 'cjk' | 'cyrillic' = 'latin';
 
@@ -192,6 +202,29 @@ export function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
+export function clampPopupPosition(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  viewportWidth: number,
+  viewportHeight: number,
+  minVisible = 60,
+): { x: number; y: number } {
+  const visibleWidth = Math.min(minVisible, width, viewportWidth);
+  const visibleHeight = Math.min(minVisible, height, viewportHeight);
+  return {
+    x: clamp(x, visibleWidth - width, viewportWidth - visibleWidth),
+    y: clamp(y, visibleHeight - height, viewportHeight - visibleHeight),
+  };
+}
+
+export function isDragHandle(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false;
+  if (!target.closest('.b3rys-sel-popup')) return false;
+  return !target.closest('button, .b3rys-sel-text, .b3rys-sel-word-translation');
+}
+
 function ensureShadowRoot(): ShadowRoot {
   if (shadowRoot) return shadowRoot;
 
@@ -214,6 +247,7 @@ function removeTrigger(): void {
 
 function removePopup(): void {
   stopSpeaking();
+  popupDragState = null;
   popupEl?.remove();
   popupEl = null;
 }
@@ -258,6 +292,7 @@ function showPopup(
 
   popupEl = document.createElement('div');
   popupEl.className = compact ? 'b3rys-sel-popup compact' : 'b3rys-sel-popup';
+  popupEl.addEventListener('mousedown', onPopupDragStart);
 
   const inner = document.createElement('div');
   inner.className = 'b3rys-sel-popup-inner';
@@ -267,6 +302,7 @@ function showPopup(
   popupAnchorX = anchorX;
   popupAnchorBottom = anchorBottom;
   popupSelectionTop = selectionTop;
+  popupWasDragged = false;
 
   // Measure containing-block origin so position works on any site
   popupEl.style.left = '0px';
@@ -352,9 +388,46 @@ function positionPopup(): void {
   const popupWidth = popupEl.classList.contains('compact') ? 320 : 440;
   const targetVX = clamp(popupAnchorX - popupWidth / 2, 8, window.innerWidth - popupWidth - 8);
 
-  popupEl.style.left = `${targetVX - popupOriginX}px`;
-  popupEl.style.top = `${placement.top - popupOriginY}px`;
+  if (!popupWasDragged) {
+    popupEl.style.left = `${targetVX - popupOriginX}px`;
+    popupEl.style.top = `${placement.top - popupOriginY}px`;
+  }
   popupEl.style.maxHeight = placement.maxHeight === null ? '' : `${placement.maxHeight}px`;
+}
+
+function onPopupDragStart(e: MouseEvent): void {
+  if (e.button !== 0 || !popupEl || !isDragHandle(e.target)) return;
+
+  const rect = popupEl.getBoundingClientRect();
+  popupDragState = {
+    startClientX: e.clientX,
+    startClientY: e.clientY,
+    startPopupX: rect.left,
+    startPopupY: rect.top,
+  };
+  e.preventDefault();
+}
+
+function onPopupDragMove(e: MouseEvent): void {
+  if (!popupEl || !popupDragState) return;
+
+  const rect = popupEl.getBoundingClientRect();
+  const position = clampPopupPosition(
+    popupDragState.startPopupX + e.clientX - popupDragState.startClientX,
+    popupDragState.startPopupY + e.clientY - popupDragState.startClientY,
+    rect.width,
+    rect.height,
+    window.innerWidth,
+    window.innerHeight,
+  );
+  popupEl.style.left = `${position.x - popupOriginX}px`;
+  popupEl.style.top = `${position.y - popupOriginY}px`;
+  popupWasDragged = true;
+  e.preventDefault();
+}
+
+function onPopupDragEnd(): void {
+  popupDragState = null;
 }
 
 function setPopupLoading(): void {
@@ -595,6 +668,8 @@ async function translateSelection(text: string, wordMode: boolean): Promise<void
 }
 
 function onMouseUp(e: MouseEvent): void {
+  if (popupDragState) return;
+
   // Ignore clicks inside our shadow host
   if (host && host.contains(e.target as Node)) return;
 
@@ -663,6 +738,8 @@ export function initSelectionPopup(): void {
 
   document.addEventListener('mouseup', onMouseUp, true);
   document.addEventListener('mousedown', onMouseDown, true);
+  document.addEventListener('mousemove', onPopupDragMove, true);
+  document.addEventListener('mouseup', onPopupDragEnd, true);
   window.addEventListener('scroll', onScroll);
   window.addEventListener('resize', onResize);
 }
@@ -673,6 +750,8 @@ export function destroySelectionPopup(): void {
 
   document.removeEventListener('mouseup', onMouseUp, true);
   document.removeEventListener('mousedown', onMouseDown, true);
+  document.removeEventListener('mousemove', onPopupDragMove, true);
+  document.removeEventListener('mouseup', onPopupDragEnd, true);
   window.removeEventListener('scroll', onScroll);
   window.removeEventListener('resize', onResize);
 

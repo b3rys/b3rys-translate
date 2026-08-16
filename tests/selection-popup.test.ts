@@ -4,6 +4,8 @@ import {
   hasMinLength,
   isSingleWord,
   clamp,
+  clampPopupPosition,
+  isDragHandle,
   parseWordResponse,
   highlightWord,
   findEnglishVoice,
@@ -82,6 +84,73 @@ describe('clamp', () => {
 
   it('returns max when value is above', () => {
     expect(clamp(15, 0, 10)).toBe(10);
+  });
+});
+
+describe('clampPopupPosition', () => {
+  it('범위 안의 위치는 그대로 둔다', () => {
+    expect(clampPopupPosition(100, 120, 320, 200, 1000, 800)).toEqual({ x: 100, y: 120 });
+  });
+
+  it('왼쪽·위로 나가도 60px은 화면에 남긴다', () => {
+    expect(clampPopupPosition(-500, -400, 320, 200, 1000, 800)).toEqual({
+      x: -260,
+      y: -140,
+    });
+  });
+
+  it('오른쪽·아래로 나가도 60px은 화면에 남긴다', () => {
+    expect(clampPopupPosition(1200, 900, 320, 200, 1000, 800)).toEqual({
+      x: 940,
+      y: 740,
+    });
+  });
+
+  it('뷰포트나 팝업이 60px보다 작아도 유효한 범위를 만든다', () => {
+    expect(clampPopupPosition(-50, 100, 40, 80, 30, 50)).toEqual({ x: -10, y: 0 });
+  });
+});
+
+describe('isDragHandle', () => {
+  const popup = (content: string) => {
+    const el = document.createElement('div');
+    el.className = 'b3rys-sel-popup';
+    el.innerHTML = content;
+    document.body.appendChild(el);
+    return el;
+  };
+
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('팝업 배경에서 시작할 수 있다', () => {
+    const el = popup('<div class="b3rys-sel-popup-inner"></div>');
+    expect(isDragHandle(el)).toBe(true);
+    expect(isDragHandle(el.firstElementChild)).toBe(true);
+  });
+
+  it('문장 번역문과 그 자식에서는 시작하지 않는다', () => {
+    const el = popup('<div class="b3rys-sel-text"><span>번역문</span></div>');
+    expect(isDragHandle(el.querySelector('.b3rys-sel-text'))).toBe(false);
+    expect(isDragHandle(el.querySelector('span'))).toBe(false);
+  });
+
+  it('단어 번역문에서는 시작하지 않는다', () => {
+    const el = popup('<span class="b3rys-sel-word-translation">번역</span>');
+    expect(isDragHandle(el.firstElementChild)).toBe(false);
+  });
+
+  it('스피커·복사 버튼과 SVG 자식에서는 시작하지 않는다', () => {
+    const el = popup('<button class="b3rys-sel-speak"><svg><path /></svg></button>');
+    expect(isDragHandle(el.querySelector('button'))).toBe(false);
+    expect(isDragHandle(el.querySelector('path'))).toBe(false);
+  });
+
+  it('팝업 밖과 Element가 아닌 target은 시작하지 않는다', () => {
+    expect(isDragHandle(document.body)).toBe(false);
+    expect(isDragHandle(document.createTextNode('text'))).toBe(false);
+    expect(isDragHandle(null)).toBe(false);
   });
 });
 
