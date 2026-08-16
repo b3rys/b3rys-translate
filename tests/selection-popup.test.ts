@@ -4,11 +4,16 @@ import {
   hasMinLength,
   isSingleWord,
   clamp,
-  splitSentences,
   parseWordResponse,
   highlightWord,
   findEnglishVoice,
   speakWord,
+  stopSpeaking,
+  toggleSpeakState,
+  parseSentenceResponse,
+  calculatePopupPlacement,
+  initSelectionPopup,
+  destroySelectionPopup,
 } from '@/entrypoints/content/selection-popup';
 
 describe('isLikelyEnglish', () => {
@@ -79,28 +84,6 @@ describe('clamp', () => {
   });
 });
 
-describe('splitSentences', () => {
-  it('splits on period + space', () => {
-    const result = splitSentences('First sentence. Second sentence.');
-    expect(result).toEqual(['First sentence.', 'Second sentence.']);
-  });
-
-  it('splits on question mark + space', () => {
-    const result = splitSentences('How are you? I am fine.');
-    expect(result).toEqual(['How are you?', 'I am fine.']);
-  });
-
-  it('returns single element for text without breaks', () => {
-    const result = splitSentences('just one sentence');
-    expect(result).toEqual(['just one sentence']);
-  });
-
-  it('filters empty segments', () => {
-    const result = splitSentences('Hello.  ');
-    expect(result.every((s) => s.trim().length > 0)).toBe(true);
-  });
-});
-
 describe('parseWordResponse', () => {
   it('parses translation and examples', () => {
     const raw = `알고리즘
@@ -127,6 +110,54 @@ describe('parseWordResponse', () => {
 • Some example without Korean`;
     const { examples } = parseWordResponse(raw);
     expect(examples).toEqual([]);
+  });
+});
+
+describe('parseSentenceResponse', () => {
+  it('[N] 접두를 제거해 번역만 반환한다', () => {
+    expect(parseSentenceResponse('[1] 번역문')).toBe('번역문');
+  });
+
+  it('여러 줄 번역을 모두 보존한다', () => {
+    const raw = `[1] 첫 번째 문단 번역입니다.
+
+두 번째 문단 번역입니다.`;
+
+    expect(parseSentenceResponse(raw)).toBe('첫 번째 문단 번역입니다.\n두 번째 문단 번역입니다.');
+  });
+
+  it('번역에서 마크다운 별표를 제거한다', () => {
+    expect(parseSentenceResponse('[1] **번역**')).toBe('번역');
+  });
+});
+
+describe('calculatePopupPlacement', () => {
+  it('아래 공간이 충분하면 선택 영역 아래에 둔다', () => {
+    expect(calculatePopupPlacement(100, 80, 200, 800)).toEqual({
+      top: 108,
+      maxHeight: null,
+      side: 'below',
+    });
+  });
+
+  it('아래가 넘치고 위가 충분하면 위로 뒤집는다', () => {
+    expect(calculatePopupPlacement(700, 650, 200, 800)).toEqual({
+      top: 442,
+      maxHeight: null,
+      side: 'above',
+    });
+  });
+
+  it('위아래 모두 부족하면 더 넓은 쪽에서 높이를 제한한다', () => {
+    expect(calculatePopupPlacement(300, 280, 500, 600)).toEqual({
+      top: 308,
+      maxHeight: 284,
+      side: 'below',
+    });
+  });
+
+  it('위로 뒤집을 때 트리거가 아닌 선택 영역 top을 기준으로 한다', () => {
+    expect(calculatePopupPlacement(700, 620, 200, 800).top).toBe(412);
   });
 });
 
@@ -193,11 +224,13 @@ describe('speakWord — 목록이 비어 있는 첫 재생', () => {
   let spoken: Array<{ text: string; voice: SpeechSynthesisVoice | null }>;
   let listeners: Array<() => void>;
   let voices: SpeechSynthesisVoice[];
+  let cancel: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     spoken = [];
     listeners = [];
     voices = [];
+    cancel = vi.fn();
     class FakeUtterance {
       voice: SpeechSynthesisVoice | null = null;
       lang = '';
@@ -207,7 +240,7 @@ describe('speakWord — 목록이 비어 있는 첫 재생', () => {
     vi.stubGlobal('SpeechSynthesisUtterance', FakeUtterance);
     vi.stubGlobal('speechSynthesis', {
       getVoices: () => voices,
-      cancel: () => {},
+      cancel,
       speak: (u: { text: string; voice: SpeechSynthesisVoice | null }) =>
         spoken.push({ text: u.text, voice: u.voice }),
       addEventListener: (_: string, fn: () => void) => listeners.push(fn),
@@ -215,7 +248,49 @@ describe('speakWord — 목록이 비어 있는 첫 재생', () => {
     });
   });
 
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => {
+    stopSpeaking();
+    vi.unstubAllGlobals();
+  });
+
+  it('상태를 재생과 정지 사이에서 토글한다', () => {
+    expect(toggleSpeakState('idle')).toBe('speaking');
+    expect(toggleSpeakState('speaking')).toBe('idle');
+  });
+
+  it('재생 중 다시 누르면 정지하고 버튼 상태를 직접 해제한다', () => {
+    voices = [GOOGLE];
+    const button = document.createElement('button');
+
+    speakWord('annum', button);
+    expect(button.classList.contains('speaking')).toBe(true);
+    speakWord('annum', button);
+
+    expect(cancel).toHaveBeenCalled();
+    expect(button.classList.contains('speaking')).toBe(false);
+    expect(spoken).toHaveLength(1);
+  });
+
+  it('팝업을 닫으면 재생을 멈추고 버튼 상태를 해제한다', () => {
+    voices = [GOOGLE];
+    const button = document.createElement('button');
+    initSelectionPopup();
+    speakWord('annum', button);
+    cancel.mockClear();
+
+    destroySelectionPopup();
+
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(button.classList.contains('speaking')).toBe(false);
+  });
+
+  it('말하지 않은 상태에서 팝업을 닫아도 페이지 음성을 취소하지 않는다', () => {
+    initSelectionPopup();
+
+    destroySelectionPopup();
+
+    expect(cancel).not.toHaveBeenCalled();
+  });
 
   it('★목록이 비면 즉시 말하지 않는다★ — 그대로 말하면 기본(한국어) 목소리로 나간다', () => {
     speakWord('annum');

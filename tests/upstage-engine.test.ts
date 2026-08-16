@@ -64,7 +64,7 @@ describe('Upstage Solar engine', () => {
     expect(body.model).toBe('solar-mini');
   });
 
-  it.each([['page' as const], ['word' as const], ['subtitle' as const]])(
+  it.each([['page' as const], ['word' as const], ['sentence' as const], ['subtitle' as const]])(
     'parses a %s translation into per-paragraph results',
     async (mode) => {
       const mock = stubFetch(translationBody('안녕하세요'));
@@ -73,6 +73,12 @@ describe('Upstage Solar engine', () => {
 
       expect(result.translations).toEqual([{ id: 'p1', translatedText: '안녕하세요' }]);
       expect(sentBody(mock).messages[0].content).toContain('Hello.');
+      if (mode === 'sentence') {
+        expect(sentBody(mock).messages[0].content).toContain(
+          'Translate each numbered sentence or paragraph below into Korean',
+        );
+        expect(sentBody(mock).messages[0].content).not.toContain('※');
+      }
     },
   );
 

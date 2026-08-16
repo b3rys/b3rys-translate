@@ -56,7 +56,8 @@
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: 15px;
   color: #e5e5e5;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   animation: selFadeIn 0.15s ease forwards;
 }
 
@@ -87,21 +88,19 @@
 }
 
 .b3rys-sel-text {
-  font-size: 15px;
-  line-height: 1.75;
+  color: #e5e5e5;
+  font-size: 13px;
+  line-height: 1.6;
   word-break: break-word;
   white-space: pre-wrap;
   letter-spacing: -0.01em;
 }
 
-/* Sentence-separated display for long translations */
-.b3rys-sel-sentence {
-  display: block;
-  margin-bottom: 6px;
-}
-
-.b3rys-sel-sentence:last-child {
-  margin-bottom: 0;
+.b3rys-sel-sentence-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .b3rys-sel-actions {
@@ -174,6 +173,11 @@
 .b3rys-sel-speak:hover {
   color: #7ee787;
   background: rgba(126, 231, 135, 0.1);
+}
+
+.b3rys-sel-speak.speaking {
+  color: #7ee787;
+  background: rgba(126, 231, 135, 0.16);
 }
 
 .b3rys-sel-speak svg {

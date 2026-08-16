@@ -60,6 +60,21 @@ Format:
 ${numbered}`;
 }
 
+export function buildSentenceTranslationPrompt(
+  paragraphs: { id: string; text: string }[],
+  lang?: LangPair,
+): string {
+  const tgt = tgtName(lang ?? {});
+  const numbered = paragraphs.map((p, i) => `[${i + 1}] ${p.text}`).join('\n\n');
+
+  return `You are a professional translator. Translate each numbered sentence or paragraph below into ${tgt}.
+Return ONLY the ${tgt} translations, each prefixed with its number in the same [N] format.
+Maintain the original meaning, tone, and paragraph structure.
+Do not add explanations or notes.
+
+${numbered}`;
+}
+
 export function buildSubtitleTranslationPrompt(
   paragraphs: { id: string; text: string }[],
   context?: { original: string; translated: string }[],

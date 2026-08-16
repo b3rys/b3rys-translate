@@ -4,6 +4,7 @@ import {
   buildTranslationPrompt,
   buildSubtitleTranslationPrompt,
   buildWordTranslationPrompt,
+  buildSentenceTranslationPrompt,
   buildSegmentationPrompt,
   parseTranslationResponse,
   callWithRetry,
@@ -91,9 +92,11 @@ export const geminiEngine: TranslationEngine = {
     const prompt =
       mode === 'word'
         ? buildWordTranslationPrompt(paragraphs, lang)
-        : mode === 'subtitle'
-          ? buildSubtitleTranslationPrompt(paragraphs, subtitleContext, lang)
-          : buildTranslationPrompt(paragraphs, lang);
+        : mode === 'sentence'
+          ? buildSentenceTranslationPrompt(paragraphs, lang)
+          : mode === 'subtitle'
+            ? buildSubtitleTranslationPrompt(paragraphs, subtitleContext, lang)
+            : buildTranslationPrompt(paragraphs, lang);
     const { text, usage } = await callGeminiAPI(apiKey, prompt, model);
     return {
       translations: parseTranslationResponse(text, paragraphs),

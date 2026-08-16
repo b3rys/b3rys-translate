@@ -69,24 +69,69 @@ function waitForVoices(): Promise<SpeechSynthesisVoice[]> {
   });
 }
 
-function speakWith(word: string, voice: SpeechSynthesisVoice | null): void {
+export type SpeakState = 'idle' | 'speaking';
+
+export function toggleSpeakState(state: SpeakState): SpeakState {
+  return state === 'speaking' ? 'idle' : 'speaking';
+}
+
+let speakState: SpeakState = 'idle';
+let activeSpeakButton: HTMLButtonElement | null = null;
+let speakRequestId = 0;
+
+function resetSpeakingUi(): void {
+  activeSpeakButton?.classList.remove('speaking');
+  activeSpeakButton = null;
+  speakState = 'idle';
+}
+
+function finishSpeaking(requestId: number): void {
+  if (requestId === speakRequestId) resetSpeakingUi();
+}
+
+export function stopSpeaking(): void {
+  if (speakState !== 'speaking') {
+    resetSpeakingUi();
+    return;
+  }
+  speakRequestId += 1;
+  if (typeof speechSynthesis !== 'undefined') speechSynthesis.cancel();
+  resetSpeakingUi();
+}
+
+function speakWith(word: string, voice: SpeechSynthesisVoice | null, requestId: number): void {
+  if (speakState !== 'speaking' || requestId !== speakRequestId) return;
   const utterance = new SpeechSynthesisUtterance(word);
   utterance.lang = 'en-US';
   utterance.rate = 0.9;
   if (voice) utterance.voice = voice;
+  utterance.onend = () => finishSpeaking(requestId);
+  utterance.onerror = () => finishSpeaking(requestId);
   speechSynthesis.cancel();
   speechSynthesis.speak(utterance);
 }
 
 // 목록이 이미 있으면 ★동기로★ 끝낸다 — 클릭 핸들러의 사용자 제스처 문맥을 벗어나지 않기 위해서다.
 // 비어 있는 첫 판에서만 기다렸다가 말한다.
-export function speakWord(word: string): void {
-  const ready = speechSynthesis.getVoices();
-  if (ready.length > 0) {
-    speakWith(word, findEnglishVoice(ready));
+export function speakWord(word: string, button?: HTMLButtonElement): void {
+  const nextState = toggleSpeakState(speakState);
+  if (nextState === 'idle') {
+    stopSpeaking();
     return;
   }
-  void waitForVoices().then((voices) => speakWith(word, findEnglishVoice(voices)));
+
+  speakState = nextState;
+  activeSpeakButton?.classList.remove('speaking');
+  activeSpeakButton = button ?? null;
+  activeSpeakButton?.classList.add('speaking');
+  const requestId = ++speakRequestId;
+
+  const ready = speechSynthesis.getVoices();
+  if (ready.length > 0) {
+    speakWith(word, findEnglishVoice(ready), requestId);
+    return;
+  }
+  void waitForVoices().then((voices) => speakWith(word, findEnglishVoice(voices), requestId));
 }
 
 // 팝업이 뜨는 시점에 목록 로딩을 깨워둔다. 클릭할 때쯤이면 대개 채워져 있어 기다림이 0 이 된다.
@@ -98,6 +143,11 @@ let host: HTMLDivElement | null = null;
 let shadowRoot: ShadowRoot | null = null;
 let triggerEl: HTMLButtonElement | null = null;
 let popupEl: HTMLDivElement | null = null;
+let popupAnchorX = 0;
+let popupAnchorBottom = 0;
+let popupSelectionTop = 0;
+let popupOriginX = 0;
+let popupOriginY = 0;
 
 let selectionSourceScript: 'latin' | 'cjk' | 'cyrillic' = 'latin';
 
@@ -163,6 +213,7 @@ function removeTrigger(): void {
 }
 
 function removePopup(): void {
+  stopSpeaking();
   popupEl?.remove();
   popupEl = null;
 }
@@ -195,7 +246,12 @@ function showTrigger(clientX: number, clientY: number, clientY2?: number): void 
   root.appendChild(triggerEl);
 }
 
-function showPopup(anchorX: number, anchorY: number, compact = false): void {
+function showPopup(
+  anchorX: number,
+  anchorBottom: number,
+  selectionTop: number,
+  compact = false,
+): void {
   removePopup();
 
   const root = ensureShadowRoot();
@@ -208,6 +264,9 @@ function showPopup(anchorX: number, anchorY: number, compact = false): void {
   popupEl.appendChild(inner);
 
   const popupWidth = compact ? 320 : 440;
+  popupAnchorX = anchorX;
+  popupAnchorBottom = anchorBottom;
+  popupSelectionTop = selectionTop;
 
   // Measure containing-block origin so position works on any site
   popupEl.style.left = '0px';
@@ -216,51 +275,109 @@ function showPopup(anchorX: number, anchorY: number, compact = false): void {
   root.appendChild(popupEl);
 
   const origin = popupEl.getBoundingClientRect();
+  popupOriginX = origin.left;
+  popupOriginY = origin.top;
 
   // Target viewport position → adjust by containing-block offset
   const targetVX = clamp(anchorX - popupWidth / 2, 8, window.innerWidth - popupWidth - 8);
-  const targetVY = anchorY + 8;
-
   popupEl.style.left = `${targetVX - origin.left}px`;
-  popupEl.style.top = `${targetVY - origin.top}px`;
   popupEl.style.visibility = '';
+  positionPopup();
+}
+
+export interface PopupPlacement {
+  top: number;
+  maxHeight: number | null;
+  side: 'above' | 'below';
+}
+
+export function calculatePopupPlacement(
+  anchorBottom: number,
+  selectionTop: number,
+  popupHeight: number,
+  viewportHeight: number,
+  margin = 8,
+  gap = 8,
+): PopupPlacement {
+  const belowSpace = Math.max(0, viewportHeight - anchorBottom - gap - margin);
+  const aboveSpace = Math.max(0, selectionTop - gap - margin);
+
+  if (popupHeight <= belowSpace) {
+    return { top: anchorBottom + gap, maxHeight: null, side: 'below' };
+  }
+  if (popupHeight <= aboveSpace) {
+    return { top: selectionTop - gap - popupHeight, maxHeight: null, side: 'above' };
+  }
+  const side = belowSpace >= aboveSpace ? 'below' : 'above';
+  const maxHeight = side === 'below' ? belowSpace : aboveSpace;
+  return {
+    top: side === 'below' ? anchorBottom + gap : margin,
+    maxHeight,
+    side,
+  };
+}
+
+function positionPopup(): void {
+  if (!popupEl) return;
+
+  popupEl.style.maxHeight = 'none';
+  const placement = calculatePopupPlacement(
+    popupAnchorBottom,
+    popupSelectionTop,
+    popupEl.scrollHeight,
+    window.innerHeight,
+  );
+  const popupWidth = popupEl.classList.contains('compact') ? 320 : 440;
+  const targetVX = clamp(popupAnchorX - popupWidth / 2, 8, window.innerWidth - popupWidth - 8);
+
+  popupEl.style.left = `${targetVX - popupOriginX}px`;
+  popupEl.style.top = `${placement.top - popupOriginY}px`;
+  popupEl.style.maxHeight = placement.maxHeight === null ? '' : `${placement.maxHeight}px`;
 }
 
 function setPopupLoading(): void {
   const inner = popupEl?.querySelector('.b3rys-sel-popup-inner');
   if (!inner) return;
   inner.innerHTML = `<div class="b3rys-sel-loading">${SPINNER_SVG}<span>번역 중...</span></div>`;
+  positionPopup();
 }
 
-/**
- * Split Korean translated text into sentences for readability.
- * Splits on sentence-ending punctuation (. ! ? 다. 요. 음. 임.) followed by a space.
- */
-export function splitSentences(text: string): string[] {
-  // Split on sentence boundaries: period/exclamation/question + space, or Korean endings
-  const parts = text.split(/(?<=[.!?])\s+/);
-  return parts.filter((s) => s.trim().length > 0);
+export function parseSentenceResponse(raw: string): string {
+  return raw
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .join('\n')
+    .replace(/^\[\d+\]\s*/, '')
+    .replace(/\*\*/g, '')
+    .trim();
 }
 
-function setPopupResult(text: string): void {
+function setPopupResult(raw: string, originalText: string): void {
   const inner = popupEl?.querySelector('.b3rys-sel-popup-inner');
   if (!inner) return;
+  const translation = parseSentenceResponse(raw);
 
   const result = document.createElement('div');
   result.className = 'b3rys-sel-result';
 
+  const header = document.createElement('div');
+  header.className = 'b3rys-sel-sentence-header';
+
   const textEl = document.createElement('div');
   textEl.className = 'b3rys-sel-text';
+  textEl.textContent = translation;
 
-  // Break long translations into separate lines per sentence
-  const sentences = splitSentences(text);
-  if (sentences.length > 1) {
-    textEl.innerHTML = sentences
-      .map((s) => `<span class="b3rys-sel-sentence">${s}</span>`)
-      .join('');
-  } else {
-    textEl.textContent = text;
-  }
+  const speakBtn = document.createElement('button');
+  speakBtn.className = 'b3rys-sel-speak';
+  speakBtn.innerHTML = SPEAK_ICON;
+  speakBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    speakWord(originalText, speakBtn);
+  });
+
+  header.appendChild(textEl);
+  header.appendChild(speakBtn);
 
   const actions = document.createElement('div');
   actions.className = 'b3rys-sel-actions';
@@ -271,7 +388,7 @@ function setPopupResult(text: string): void {
   copyBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     navigator.clipboard
-      .writeText(text)
+      .writeText(translation)
       .then(() => {
         copyBtn.innerHTML = CHECK_ICON;
         setTimeout(() => {
@@ -282,11 +399,12 @@ function setPopupResult(text: string): void {
   });
 
   actions.appendChild(copyBtn);
-  result.appendChild(textEl);
+  result.appendChild(header);
   result.appendChild(actions);
 
   inner.innerHTML = '';
   inner.appendChild(result);
+  positionPopup();
 }
 
 interface WordExample {
@@ -351,7 +469,7 @@ function setPopupWordResult(raw: string, originalWord: string): void {
   speakBtn.innerHTML = SPEAK_ICON;
   speakBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    speakWord(originalWord);
+    speakWord(originalWord, speakBtn);
   });
 
   header.appendChild(headerText);
@@ -398,12 +516,14 @@ function setPopupWordResult(raw: string, originalWord: string): void {
 
   inner.innerHTML = '';
   inner.appendChild(result);
+  positionPopup();
 }
 
 function setPopupError(message: string): void {
   const inner = popupEl?.querySelector('.b3rys-sel-popup-inner');
   if (!inner) return;
   inner.innerHTML = `<div class="b3rys-sel-error">${message}</div>`;
+  positionPopup();
 }
 
 async function translateSelection(text: string, wordMode: boolean): Promise<void> {
@@ -413,7 +533,7 @@ async function translateSelection(text: string, wordMode: boolean): Promise<void
     const response: TranslateBatchResponse = await chrome.runtime.sendMessage({
       type: 'TRANSLATE_BATCH',
       paragraphs: [{ id: 'selection-0', text }],
-      mode: wordMode ? 'word' : 'page',
+      mode: wordMode ? 'word' : 'sentence',
     });
 
     // Popup may have been closed while waiting
@@ -437,7 +557,7 @@ async function translateSelection(text: string, wordMode: boolean): Promise<void
       if (wordMode) {
         setPopupWordResult(translated, text);
       } else {
-        setPopupResult(translated);
+        setPopupResult(translated, text);
       }
     } else {
       setPopupError('번역 결과가 없습니다.');
@@ -488,7 +608,7 @@ function onMouseUp(e: MouseEvent): void {
           const anchorY = triggerRect.bottom;
 
           removeTrigger();
-          showPopup(anchorX, anchorY, wordMode);
+          showPopup(anchorX, anchorY, lastRect.top, wordMode);
           translateSelection(text, wordMode);
         },
         { once: true },

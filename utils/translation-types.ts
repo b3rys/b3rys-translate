@@ -1,1 +1,1 @@
-export type TranslationRequestMode = 'page' | 'subtitle' | 'word' | 'segment';
+export type TranslationRequestMode = 'page' | 'subtitle' | 'word' | 'sentence' | 'segment';
