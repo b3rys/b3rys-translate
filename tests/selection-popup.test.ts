@@ -12,6 +12,7 @@ import {
   toggleSpeakState,
   parseSentenceResponse,
   calculatePopupPlacement,
+  topOfRects,
   initSelectionPopup,
   destroySelectionPopup,
 } from '@/entrypoints/content/selection-popup';
@@ -158,6 +159,43 @@ describe('calculatePopupPlacement', () => {
 
   it('위로 뒤집을 때 트리거가 아닌 선택 영역 top을 기준으로 한다', () => {
     expect(calculatePopupPlacement(700, 620, 200, 800).top).toBe(412);
+  });
+});
+
+describe('topOfRects', () => {
+  const rect = (top: number, height = 20, width = 300): DOMRect =>
+    ({ top, height, width, bottom: top + height, left: 0, right: width }) as DOMRect;
+
+  it('여러 줄이면 첫 줄의 top 을 쓴다', () => {
+    expect(topOfRects([rect(760), rect(786), rect(812)])).toBe(760);
+  });
+
+  it('rect 순서가 뒤집혀 있어도 가장 위를 고른다', () => {
+    expect(topOfRects([rect(812), rect(760), rect(786)])).toBe(760);
+  });
+
+  it('한 줄이면 그 줄의 top 이다', () => {
+    expect(topOfRects([rect(500)])).toBe(500);
+  });
+
+  it('폭·높이가 0 인 빈 rect 는 무시한다', () => {
+    expect(topOfRects([rect(10, 0, 0), rect(760)])).toBe(760);
+  });
+
+  it('쓸 수 있는 rect 가 하나도 없으면 0 이다', () => {
+    expect(topOfRects([])).toBe(0);
+    expect(topOfRects([rect(10, 0, 0)])).toBe(0);
+  });
+
+  it('마지막 줄 top 을 쓰면 위로 뒤집힌 팝업이 첫 줄을 덮는다 — 그래서 첫 줄을 쓴다', () => {
+    const lines = [rect(760), rect(786)];
+    const popupHeight = 120;
+    const withFirst = calculatePopupPlacement(806, topOfRects(lines), popupHeight, 878);
+    const withLast = calculatePopupPlacement(806, lines[lines.length - 1].top, popupHeight, 878);
+
+    expect(withFirst.side).toBe('above');
+    expect(withFirst.top + popupHeight).toBeLessThanOrEqual(760);
+    expect(withLast.top + popupHeight).toBeGreaterThan(760);
   });
 });
 

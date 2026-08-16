@@ -291,6 +291,28 @@ export interface PopupPlacement {
   side: 'above' | 'below';
 }
 
+/**
+ * Top of the whole selection — the first line, not the last one.
+ *
+ * A multi-line selection produces one rect per line. Passing the last line's top
+ * to the placement makes an 'above' popup sit 8px over that line, which is still
+ * inside the selection: the popup then covers the lines before it. The reader
+ * needs the original text visible while reading the translation, so the popup
+ * has to clear the topmost line.
+ *
+ * Empty rects (zero width and height) appear at line boundaries and carry no
+ * position, so they are skipped.
+ */
+export function topOfRects(rects: ArrayLike<DOMRect>): number {
+  let top = Infinity;
+  for (let i = 0; i < rects.length; i++) {
+    const r = rects[i];
+    if (r.width === 0 && r.height === 0) continue;
+    if (r.top < top) top = r.top;
+  }
+  return Number.isFinite(top) ? top : 0;
+}
+
 export function calculatePopupPlacement(
   anchorBottom: number,
   selectionTop: number,
@@ -608,7 +630,7 @@ function onMouseUp(e: MouseEvent): void {
           const anchorY = triggerRect.bottom;
 
           removeTrigger();
-          showPopup(anchorX, anchorY, lastRect.top, wordMode);
+          showPopup(anchorX, anchorY, topOfRects(rects), wordMode);
           translateSelection(text, wordMode);
         },
         { once: true },
