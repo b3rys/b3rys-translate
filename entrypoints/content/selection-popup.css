@@ -59,6 +59,7 @@
   overflow-x: hidden;
   overflow-y: auto;
   animation: selFadeIn 0.15s ease forwards;
+  cursor: move;
 }
 
 .b3rys-sel-popup-inner {
@@ -94,6 +95,7 @@
   word-break: break-word;
   white-space: pre-wrap;
   letter-spacing: -0.01em;
+  cursor: text;
 }
 
 .b3rys-sel-sentence-header {
@@ -198,6 +200,7 @@
 .b3rys-sel-word-translation {
   font-weight: 700;
   color: #7ee787;
+  cursor: text;
 }
 
 /* English definition */

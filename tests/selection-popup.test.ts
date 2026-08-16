@@ -4,6 +4,8 @@ import {
   hasMinLength,
   isSingleWord,
   clamp,
+  clampPopupPosition,
+  isDragHandle,
   parseWordResponse,
   highlightWord,
   findEnglishVoice,
@@ -12,6 +14,7 @@ import {
   toggleSpeakState,
   parseSentenceResponse,
   calculatePopupPlacement,
+  topOfRects,
   initSelectionPopup,
   destroySelectionPopup,
 } from '@/entrypoints/content/selection-popup';
@@ -81,6 +84,73 @@ describe('clamp', () => {
 
   it('returns max when value is above', () => {
     expect(clamp(15, 0, 10)).toBe(10);
+  });
+});
+
+describe('clampPopupPosition', () => {
+  it('범위 안의 위치는 그대로 둔다', () => {
+    expect(clampPopupPosition(100, 120, 320, 200, 1000, 800)).toEqual({ x: 100, y: 120 });
+  });
+
+  it('왼쪽·위로 나가도 60px은 화면에 남긴다', () => {
+    expect(clampPopupPosition(-500, -400, 320, 200, 1000, 800)).toEqual({
+      x: -260,
+      y: -140,
+    });
+  });
+
+  it('오른쪽·아래로 나가도 60px은 화면에 남긴다', () => {
+    expect(clampPopupPosition(1200, 900, 320, 200, 1000, 800)).toEqual({
+      x: 940,
+      y: 740,
+    });
+  });
+
+  it('뷰포트나 팝업이 60px보다 작아도 유효한 범위를 만든다', () => {
+    expect(clampPopupPosition(-50, 100, 40, 80, 30, 50)).toEqual({ x: -10, y: 0 });
+  });
+});
+
+describe('isDragHandle', () => {
+  const popup = (content: string) => {
+    const el = document.createElement('div');
+    el.className = 'b3rys-sel-popup';
+    el.innerHTML = content;
+    document.body.appendChild(el);
+    return el;
+  };
+
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('팝업 배경에서 시작할 수 있다', () => {
+    const el = popup('<div class="b3rys-sel-popup-inner"></div>');
+    expect(isDragHandle(el)).toBe(true);
+    expect(isDragHandle(el.firstElementChild)).toBe(true);
+  });
+
+  it('문장 번역문과 그 자식에서는 시작하지 않는다', () => {
+    const el = popup('<div class="b3rys-sel-text"><span>번역문</span></div>');
+    expect(isDragHandle(el.querySelector('.b3rys-sel-text'))).toBe(false);
+    expect(isDragHandle(el.querySelector('span'))).toBe(false);
+  });
+
+  it('단어 번역문에서는 시작하지 않는다', () => {
+    const el = popup('<span class="b3rys-sel-word-translation">번역</span>');
+    expect(isDragHandle(el.firstElementChild)).toBe(false);
+  });
+
+  it('스피커·복사 버튼과 SVG 자식에서는 시작하지 않는다', () => {
+    const el = popup('<button class="b3rys-sel-speak"><svg><path /></svg></button>');
+    expect(isDragHandle(el.querySelector('button'))).toBe(false);
+    expect(isDragHandle(el.querySelector('path'))).toBe(false);
+  });
+
+  it('팝업 밖과 Element가 아닌 target은 시작하지 않는다', () => {
+    expect(isDragHandle(document.body)).toBe(false);
+    expect(isDragHandle(document.createTextNode('text'))).toBe(false);
+    expect(isDragHandle(null)).toBe(false);
   });
 });
 
@@ -158,6 +228,43 @@ describe('calculatePopupPlacement', () => {
 
   it('위로 뒤집을 때 트리거가 아닌 선택 영역 top을 기준으로 한다', () => {
     expect(calculatePopupPlacement(700, 620, 200, 800).top).toBe(412);
+  });
+});
+
+describe('topOfRects', () => {
+  const rect = (top: number, height = 20, width = 300): DOMRect =>
+    ({ top, height, width, bottom: top + height, left: 0, right: width }) as DOMRect;
+
+  it('여러 줄이면 첫 줄의 top 을 쓴다', () => {
+    expect(topOfRects([rect(760), rect(786), rect(812)])).toBe(760);
+  });
+
+  it('rect 순서가 뒤집혀 있어도 가장 위를 고른다', () => {
+    expect(topOfRects([rect(812), rect(760), rect(786)])).toBe(760);
+  });
+
+  it('한 줄이면 그 줄의 top 이다', () => {
+    expect(topOfRects([rect(500)])).toBe(500);
+  });
+
+  it('폭·높이가 0 인 빈 rect 는 무시한다', () => {
+    expect(topOfRects([rect(10, 0, 0), rect(760)])).toBe(760);
+  });
+
+  it('쓸 수 있는 rect 가 하나도 없으면 0 이다', () => {
+    expect(topOfRects([])).toBe(0);
+    expect(topOfRects([rect(10, 0, 0)])).toBe(0);
+  });
+
+  it('마지막 줄 top 을 쓰면 위로 뒤집힌 팝업이 첫 줄을 덮는다 — 그래서 첫 줄을 쓴다', () => {
+    const lines = [rect(760), rect(786)];
+    const popupHeight = 120;
+    const withFirst = calculatePopupPlacement(806, topOfRects(lines), popupHeight, 878);
+    const withLast = calculatePopupPlacement(806, lines[lines.length - 1].top, popupHeight, 878);
+
+    expect(withFirst.side).toBe('above');
+    expect(withFirst.top + popupHeight).toBeLessThanOrEqual(760);
+    expect(withLast.top + popupHeight).toBeGreaterThan(760);
   });
 });
 
