@@ -1,5 +1,5 @@
 import './content/translator.css';
-import { createFloatingButton } from './content/floating-button';
+import { createFloatingButton, createNullFloatingButton } from './content/floating-button';
 import {
   translatePage,
   removeAllTranslations,
@@ -38,13 +38,25 @@ async function hasApiKeyStored(): Promise<boolean> {
 
 export default defineContentScript({
   matches: ['<all_urls>'],
+  // Page text often lives in an iframe rather than in the top document —
+  // neurips.cc renders the paper body from <iframe src="bytez.com/read/…">.
+  // Without this the content script never reaches it and that text stays
+  // untranslated. See isTopFrame below for what a sub-frame does NOT do.
+  allFrames: true,
   runAt: 'document_idle',
 
   main() {
+    // Everything below was written for the top document. With allFrames on it
+    // now also runs in every sub-frame, so the parts that draw UI or own
+    // cross-page state stay behind this flag.
+    const isTopFrame = window.top === window.self;
+
     // Identify the running bundle (debug mode only — default console is silent).
     dbg(`content script ${BUILD_TAG}`);
-    // Initialize YouTube dual subtitles if on YouTube
-    if (location.hostname === 'www.youtube.com') {
+    // Initialize YouTube dual subtitles if on YouTube.
+    // Top frame only: an embedded player is also www.youtube.com, and the
+    // controller drives the watch page's player and caption window.
+    if (isTopFrame && location.hostname === 'www.youtube.com') {
       import('./content/youtube/youtube-controller').then(({ initYouTubeSubtitles }) => {
         initYouTubeSubtitles();
       });
@@ -55,10 +67,11 @@ export default defineContentScript({
 
     // Load source language setting for text detection filters
     import('./content/text-detector').then(({ loadSourceLanguage }) => loadSourceLanguage());
-    loadSelectionSourceLanguage();
+    if (isTopFrame) loadSelectionSourceLanguage();
 
-    // Selection popup — translate highlighted text
-    initSelectionPopup();
+    // Selection popup — translate highlighted text. Top frame only: it binds
+    // document-level listeners and positions itself in the viewport.
+    if (isTopFrame) initSelectionPopup();
 
     let lastUrl = location.href;
 
@@ -94,6 +107,9 @@ export default defineContentScript({
       onStateChange: (state) => fab.setState(state),
       onProgress: (ratio) => fab.setProgress(ratio),
       persistEnabled: async (enabled) => {
+        // The FAB intent belongs to the top frame. A sub-frame writing it back
+        // would only re-fire the storage listener it is itself driven by.
+        if (!isTopFrame) return;
         try {
           await chrome.storage.local.set({ translationEnabled: enabled });
         } catch (err) {
@@ -104,6 +120,8 @@ export default defineContentScript({
         }
       },
       openPopup: () => {
+        // One popup per tab — the top frame opens it.
+        if (!isTopFrame) return;
         chrome.runtime.sendMessage({ type: 'OPEN_POPUP' }).catch((err) => {
           if (isContextInvalidated(err)) {
             markContextInvalidated();
@@ -113,33 +131,36 @@ export default defineContentScript({
       },
     });
 
-    fab = createFloatingButton(async () => {
-      dbg('FAB click; state=%s invalidated=%s', sm.state, isMarkedInvalidated());
-      if (isMarkedInvalidated()) {
-        fab.showToast('새로고침하세요.');
-        return;
-      }
-      try {
-        await sm.onFabClick();
-      } catch (err) {
-        if (isContextInvalidated(err)) {
-          markContextInvalidated();
-          fab.showToast('새로고침하세요.');
-          return;
-        }
-        throw err;
-      }
-    });
+    fab = !isTopFrame
+      ? createNullFloatingButton()
+      : createFloatingButton(async () => {
+          dbg('FAB click; state=%s invalidated=%s', sm.state, isMarkedInvalidated());
+          if (isMarkedInvalidated()) {
+            fab.showToast('새로고침하세요.');
+            return;
+          }
+          try {
+            await sm.onFabClick();
+          } catch (err) {
+            if (isContextInvalidated(err)) {
+              markContextInvalidated();
+              fab.showToast('새로고침하세요.');
+              return;
+            }
+            throw err;
+          }
+        });
 
     // Apply initial floating button visibility (also controls selection popup)
-    chrome.storage.local
-      .get<{ floatingButtonVisible?: boolean }>('floatingButtonVisible')
-      .then(({ floatingButtonVisible }) => {
-        if (floatingButtonVisible === false) {
-          fab.hide();
-          destroySelectionPopup();
-        }
-      });
+    if (isTopFrame)
+      chrome.storage.local
+        .get<{ floatingButtonVisible?: boolean }>('floatingButtonVisible')
+        .then(({ floatingButtonVisible }) => {
+          if (floatingButtonVisible === false) {
+            fab.hide();
+            destroySelectionPopup();
+          }
+        });
 
     // Restore translation mode from storage
     chrome.storage.local
@@ -159,14 +180,16 @@ export default defineContentScript({
     });
 
     // Load initial usage gauge (usage/cost lives in storage.local — see
-    // usage-storage note: sync's write quota can't take per-batch writes)
-    chrome.storage.local
-      .get(USAGE_RATIO_KEY)
-      .then((data) => {
-        const ratio = data[USAGE_RATIO_KEY] as number | undefined;
-        if (ratio !== undefined) fab.setUsageGauge(ratio);
-      })
-      .catch(() => {});
+    // usage-storage note: sync's write quota can't take per-batch writes).
+    // The gauge is part of the FAB, so only the top frame reads it.
+    if (isTopFrame)
+      chrome.storage.local
+        .get(USAGE_RATIO_KEY)
+        .then((data) => {
+          const ratio = data[USAGE_RATIO_KEY] as number | undefined;
+          if (ratio !== undefined) fab.setUsageGauge(ratio);
+        })
+        .catch(() => {});
 
     // Listen for storage changes from other tabs. All settings + usage live in
     // storage.local now (sync's write quota can't take our write volume — see
@@ -192,6 +215,22 @@ export default defineContentScript({
       if (changes.autoTranslate) {
         autoTranslate = changes.autoTranslate.newValue === true;
       }
+
+      // A sub-frame has no FAB of its own, and nothing else carries a click
+      // across frames: TOGGLE_TRANSLATION has no sender, and translatePage()
+      // only ever touches its own document. The state machine persists the
+      // FAB's on/off intent as `translationEnabled`, so following that key is
+      // what makes one click translate the iframes too.
+      //
+      // This follows the CHANGE event only, so a frame that loads after the
+      // click misses it — a lazily loaded iframe, or one that navigated itself.
+      // Reading the key on load instead would carry the previous page's value
+      // over and translate sub-frames on their own, which is auto-translate
+      // (off by default, and it costs API calls). Doing this properly needs a
+      // per-page signal rather than a stored key.
+      if (!isTopFrame && changes.translationEnabled) {
+        sm.handleToggle(changes.translationEnabled.newValue === true);
+      }
     });
 
     // Listen for toggles from popup
@@ -205,7 +244,7 @@ export default defineContentScript({
         setTranslationModeWhenAvailable(message.mode);
         chrome.storage.local.set({ translationMode: message.mode }).catch(() => {});
       }
-      if (message.type === 'TOGGLE_FLOATING_BUTTON') {
+      if (message.type === 'TOGGLE_FLOATING_BUTTON' && isTopFrame) {
         if (message.visible) {
           fab.show();
           initSelectionPopup();
