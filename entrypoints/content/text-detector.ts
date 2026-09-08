@@ -711,38 +711,73 @@ function getDirectText(el: HTMLElement): string {
   return text;
 }
 
-/** Selector string for stripping SKIP_TAGS descendants from HTML */
-const SKIP_TAGS_SELECTOR = Array.from(SKIP_TAGS).join(',');
-
 /** Attributes to preserve in HTML sent to translation API (tag → attr names) */
 const API_KEEP_ATTRS: Record<string, Set<string>> = {
   A: new Set(['href']),
 };
 
-/** Clean element for API: strip SKIP_TAGS descendants and non-essential attributes */
-function cleanForAPI(el: HTMLElement): string {
-  const clone = el.cloneNode(true) as HTMLElement;
-  clone.querySelectorAll(SKIP_TAGS_SELECTOR).forEach((n) => n.remove());
-  for (const node of [clone, ...Array.from(clone.querySelectorAll('*'))]) {
-    const elem = node as HTMLElement;
-    const keep = API_KEEP_ATTRS[elem.tagName] ?? new Set<string>();
-    for (const attr of Array.from(elem.attributes)) {
-      if (!keep.has(attr.name)) elem.removeAttribute(attr.name);
-    }
-  }
-  return clone.outerHTML;
+const NO_KEEP_ATTRS = new Set<string>();
+
+/** Elements that have no closing tag — writing one produces invalid markup */
+const VOID_TAGS = new Set([
+  'AREA',
+  'BASE',
+  'BR',
+  'COL',
+  'EMBED',
+  'HR',
+  'IMG',
+  'INPUT',
+  'LINK',
+  'META',
+  'PARAM',
+  'SOURCE',
+  'TRACK',
+  'WBR',
+]);
+
+function escapeText(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-/** Get HTML content excluding boundary children (preserves inline markup) */
+function escapeAttrValue(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+}
+
+/**
+ * Serialize one non-boundary child for the API.
+ * Keeps the tag and API_KEEP_ATTRS, then recurses through getDirectHTML so the
+ * boundary rule applies at every depth instead of only at the top level.
+ */
+function serializeForAPI(el: HTMLElement): string {
+  const tag = el.tagName.toLowerCase();
+  const keep = API_KEEP_ATTRS[el.tagName] ?? NO_KEEP_ATTRS;
+  let attrs = '';
+  for (const attr of Array.from(el.attributes)) {
+    if (keep.has(attr.name)) attrs += ` ${attr.name}="${escapeAttrValue(attr.value)}"`;
+  }
+  if (VOID_TAGS.has(el.tagName)) return `<${tag}${attrs}>`;
+  return `<${tag}${attrs}>${getDirectHTML(el)}</${tag}>`;
+}
+
+/**
+ * Get HTML content excluding boundary children (preserves inline markup).
+ *
+ * Recurses on the same rule as getDirectText. Serializing a child's whole
+ * subtree instead would send blocks that the parent's own text stops at: a
+ * collapsed dropdown reads as "Main Conference" in text, so it passes the
+ * length and label filters, while its display:none submenu — 2487 chars on
+ * neurips.cc — rides along in html and renders as one giant translated block.
+ */
 function getDirectHTML(el: HTMLElement): string {
   let html = '';
   for (const child of el.childNodes) {
     if (child.nodeType === Node.TEXT_NODE) {
-      html += child.textContent ?? '';
+      html += escapeText(child.textContent ?? '');
     } else if (child.nodeType === Node.ELEMENT_NODE) {
       const childEl = child as HTMLElement;
       if (isTextCollectionBoundary(childEl)) continue;
-      html += cleanForAPI(childEl);
+      html += serializeForAPI(childEl);
     }
   }
   return html;
