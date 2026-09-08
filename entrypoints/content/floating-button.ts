@@ -32,6 +32,28 @@ export interface FloatingButton {
   destroy: () => void;
 }
 
+/**
+ * A FloatingButton that renders nothing.
+ *
+ * Sub-frames translate their own document but must not draw the UI:
+ * createFloatingButton appends a position:fixed host to document.body, so with
+ * allFrames on, every iframe would stack its own FAB over the page. The call
+ * sites stay identical instead of growing a null check each.
+ */
+export function createNullFloatingButton(): FloatingButton {
+  return {
+    setState: () => {},
+    setProgress: () => {},
+    setUsageGauge: () => {},
+    setMode: () => {},
+    onModeToggle: () => {},
+    showToast: () => {},
+    show: () => {},
+    hide: () => {},
+    destroy: () => {},
+  };
+}
+
 export function createFloatingButton(onClick: () => void): FloatingButton {
   const host = document.createElement('div');
   host.id = 'b3rys-translate-root';
