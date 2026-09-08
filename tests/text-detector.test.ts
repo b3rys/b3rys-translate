@@ -284,3 +284,111 @@ describe('navigation labels', () => {
     expect(texts).toContain('Policy');
   });
 });
+
+// ============================================================
+// html payload boundary (Phase 1 — getDirectHTML)
+// ============================================================
+// getDirectText 는 경계 자식에서 멈추고 getDirectHTML 은 안 멈추면, 짧은 text 로
+// 필터를 통과한 블록이 그 자식들의 subtree 전체를 payload 에 싣는다.
+// 접힌 드롭다운이 그 형태다 — 보이는 글자는 "Main Conference" 하나인데,
+// display:none 인 ul.dropdown-menu 는 안 보여서 자기 블록이 안 되고,
+// 그래서 바깥 li 가 조상 필터에도 안 걸린 채 메뉴 전체를 payload 로 보낸다.
+
+/**
+ * display:none 재현. happy-dom 은 레이아웃을 계산하지 않아 offsetParent 가 undefined,
+ * getClientRects 가 항상 1개다 — isElementHidden 이 보는 두 값을 직접 눌러야 한다.
+ */
+function hideSubtree(root: Element): void {
+  const hide = (el: HTMLElement): void => {
+    Object.defineProperty(el, 'offsetParent', { value: null, configurable: true });
+    el.getClientRects = () => [] as unknown as DOMRectList;
+  };
+  hide(root as HTMLElement);
+  root.querySelectorAll('*').forEach((el) => hide(el as HTMLElement));
+}
+
+describe('html payload respects text collection boundaries', () => {
+  function collapsedDropdown(): HTMLElement {
+    const container = setupDOM(`
+      <ul>
+        <li class="dropdown-item dropdown pe-3">
+          <a href="#">Main Conference</a>
+          <ul class="dropdown-menu">
+            <li><a href="/invited">Invited Talks</a></li>
+            <li><a href="/orals">Oral Presentations</a></li>
+          </ul>
+        </li>
+      </ul>`);
+    hideSubtree(container.querySelector('.dropdown-menu')!);
+    return container;
+  }
+
+  it('drops nested block children from the html payload, not just from text', () => {
+    const container = collapsedDropdown();
+
+    const menu = detectTextBlocks(container).find((b) => b.text.trim() === 'Main Conference');
+
+    expect(menu).toBeDefined();
+    expect(menu!.html).toContain('Main Conference');
+    expect(menu!.html).not.toContain('Invited Talks');
+    expect(menu!.html).not.toContain('Oral Presentations');
+  });
+
+  it('keeps inline markup in the html payload', () => {
+    const container = setupDOM(
+      `<p>Read the <a href="/docs">docs</a> and the <strong>notes</strong> with <em>care</em>.</p>`,
+    );
+
+    const block = detectTextBlocks(container).find((b) => b.text.includes('Read the'));
+
+    expect(block).toBeDefined();
+    expect(block!.html).toContain('<a href="/docs">docs</a>');
+    expect(block!.html).toContain('<strong>notes</strong>');
+    expect(block!.html).toContain('<em>care</em>');
+  });
+
+  it('drops attributes outside API_KEEP_ATTRS and keeps A href', () => {
+    const container = setupDOM(
+      `<p>See <a href="/x" class="btn" data-track="1" title="t">this page</a> now.</p>`,
+    );
+
+    const block = detectTextBlocks(container).find((b) => b.text.includes('See'));
+
+    expect(block!.html).toContain('<a href="/x">this page</a>');
+    expect(block!.html).not.toContain('data-track');
+    expect(block!.html).not.toContain('class=');
+  });
+
+  it('removes SKIP_TAGS descendants from the html payload', () => {
+    const container = setupDOM(
+      `<p>Install it first <span><script>alert(1)</script>and then run it twice</span>.</p>`,
+    );
+
+    const block = detectTextBlocks(container).find((b) => b.text.includes('Install it first'));
+
+    expect(block!.html).toContain('and then run it twice');
+    expect(block!.html).not.toContain('alert(1)');
+    expect(block!.html).not.toContain('<script');
+  });
+
+  it('serializes void elements without a closing tag', () => {
+    const container = setupDOM(
+      `<p>The first line is here<span>then<br>the second line follows</span></p>`,
+    );
+
+    const block = detectTextBlocks(container).find((b) => b.text.includes('first line'));
+
+    expect(block!.html).toContain('<br>');
+    expect(block!.html).not.toContain('</br>');
+  });
+
+  it('escapes " and & in a kept href', () => {
+    const container = setupDOM(
+      `<p>Open the <a href='/s?a=1&b=2&quot;x&quot;'>search results page</a> now.</p>`,
+    );
+
+    const block = detectTextBlocks(container).find((b) => b.text.includes('Open the'));
+
+    expect(block!.html).toContain('href="/s?a=1&amp;b=2&quot;x&quot;"');
+  });
+});
