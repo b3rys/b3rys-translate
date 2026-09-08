@@ -757,7 +757,12 @@ function serializeForAPI(el: HTMLElement): string {
     if (keep.has(attr.name)) attrs += ` ${attr.name}="${escapeAttrValue(attr.value)}"`;
   }
   if (VOID_TAGS.has(el.tagName)) return `<${tag}${attrs}>`;
-  return `<${tag}${attrs}>${getDirectHTML(el)}</${tag}>`;
+  // A container whose every child was a boundary (a <ul> of <li> items) has
+  // nothing left but the whitespace between them. Emit one space instead of an
+  // empty tag pair so no whitespace-only container reaches the payload.
+  const inner = getDirectHTML(el);
+  if (inner.trim() === '') return ' ';
+  return `<${tag}${attrs}>${inner}</${tag}>`;
 }
 
 /**
@@ -768,12 +773,19 @@ function serializeForAPI(el: HTMLElement): string {
  * collapsed dropdown reads as "Main Conference" in text, so it passes the
  * length and label filters, while its display:none submenu — 2487 chars on
  * neurips.cc — rides along in html and renders as one giant translated block.
+ *
+ * Whitespace-only text nodes collapse to one space. Skipping boundary children
+ * leaves the indentation between them behind (1012 chars, 200 newlines for one
+ * neurips.cc year menu); under `white-space: pre-wrap` that renders as a
+ * 3366px-tall translated node. Text nodes with any non-space character are
+ * kept verbatim.
  */
 function getDirectHTML(el: HTMLElement): string {
   let html = '';
   for (const child of el.childNodes) {
     if (child.nodeType === Node.TEXT_NODE) {
-      html += escapeText(child.textContent ?? '');
+      const text = child.textContent ?? '';
+      html += /^\s*$/.test(text) ? ' ' : escapeText(text);
     } else if (child.nodeType === Node.ELEMENT_NODE) {
       const childEl = child as HTMLElement;
       if (isTextCollectionBoundary(childEl)) continue;

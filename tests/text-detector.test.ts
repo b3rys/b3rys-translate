@@ -314,8 +314,14 @@ describe('html payload respects text collection boundaries', () => {
         <li class="dropdown-item dropdown pe-3">
           <a href="#">Main Conference</a>
           <ul class="dropdown-menu">
+
+
             <li><a href="/invited">Invited Talks</a></li>
+
+
             <li><a href="/orals">Oral Presentations</a></li>
+
+
           </ul>
         </li>
       </ul>`);
@@ -332,6 +338,40 @@ describe('html payload respects text collection boundaries', () => {
     expect(menu!.html).toContain('Main Conference');
     expect(menu!.html).not.toContain('Invited Talks');
     expect(menu!.html).not.toContain('Oral Presentations');
+  });
+
+  it('leaves no whitespace-only container or blank lines in the html payload', () => {
+    const container = collapsedDropdown();
+
+    const menu = detectTextBlocks(container).find((b) => b.text.trim() === 'Main Conference');
+
+    expect(menu).toBeDefined();
+    // The submenu's <li> items are boundaries; only the indentation between them
+    // is left, and that must not reach the payload as a "<ul> </ul>" shell.
+    expect(menu!.html.replace(/\s+/g, ' ').trim()).toBe('<a href="#">Main Conference</a>');
+    expect(menu!.html).not.toMatch(/\n\s*\n/);
+  });
+
+  it('collapses whitespace-only text between inline children to one space', () => {
+    const container = setupDOM(`<p>Read the <a href="/docs">docs</a>
+
+
+          <strong>notes</strong> now.</p>`);
+
+    const block = detectTextBlocks(container).find((b) => b.text.includes('Read the'));
+
+    expect(block).toBeDefined();
+    expect(block!.html).toBe('Read the <a href="/docs">docs</a> <strong>notes</strong> now.');
+    expect(block!.html).not.toMatch(/\n\s*\n/);
+  });
+
+  it('keeps whitespace inside text nodes that carry characters', () => {
+    const container = setupDOM(`<p>Keep  two   spaces <em>and\n  this</em> here.</p>`);
+
+    const block = detectTextBlocks(container).find((b) => b.text.includes('Keep'));
+
+    expect(block!.html).toContain('Keep  two   spaces');
+    expect(block!.html).toContain('<em>and\n  this</em>');
   });
 
   it('keeps inline markup in the html payload', () => {
