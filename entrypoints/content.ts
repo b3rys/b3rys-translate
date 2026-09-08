@@ -20,7 +20,7 @@ import {
   markContextInvalidated,
 } from './content/context-invalidated';
 import type { TranslationMode } from '@/types';
-import type { ContentMessage } from '@/utils/messaging';
+import type { ContentMessage, RelayFrameToggleMessage } from '@/utils/messaging';
 import { SKIP_HOSTS, USAGE_RATIO_KEY, BUILD_TAG } from '@/utils/constants';
 import { TranslationStateMachine } from '@/utils/translation-state';
 import { dbg } from '@/utils/debug';
@@ -107,9 +107,16 @@ export default defineContentScript({
       onStateChange: (state) => fab.setState(state),
       onProgress: (ratio) => fab.setProgress(ratio),
       persistEnabled: async (enabled) => {
-        // The FAB intent belongs to the top frame. A sub-frame writing it back
-        // would only re-fire the storage listener it is itself driven by.
+        // The FAB intent belongs to the top frame. A sub-frame has no FAB and
+        // is driven by FRAME_TOGGLE below, so it neither stores nor relays.
         if (!isTopFrame) return;
+        // Relay the intent to this tab's sub-frames through the background.
+        // The stored key cannot carry it: storage.onChanged fires only when the
+        // value changes, so a second ON while the key is already true reaches
+        // no frame, and it would also wake sub-frames in every other tab.
+        chrome.runtime
+          .sendMessage({ type: 'RELAY_FRAME_TOGGLE', enabled } satisfies RelayFrameToggleMessage)
+          .catch(() => {});
         try {
           await chrome.storage.local.set({ translationEnabled: enabled });
         } catch (err) {
@@ -216,26 +223,22 @@ export default defineContentScript({
         autoTranslate = changes.autoTranslate.newValue === true;
       }
 
-      // A sub-frame has no FAB of its own, and nothing else carries a click
-      // across frames: TOGGLE_TRANSLATION has no sender, and translatePage()
-      // only ever touches its own document. The state machine persists the
-      // FAB's on/off intent as `translationEnabled`, so following that key is
-      // what makes one click translate the iframes too.
-      //
-      // This follows the CHANGE event only, so a frame that loads after the
-      // click misses it — a lazily loaded iframe, or one that navigated itself.
-      // Reading the key on load instead would carry the previous page's value
-      // over and translate sub-frames on their own, which is auto-translate
-      // (off by default, and it costs API calls). Doing this properly needs a
-      // per-page signal rather than a stored key.
-      if (!isTopFrame && changes.translationEnabled) {
-        sm.handleToggle(changes.translationEnabled.newValue === true);
-      }
+      // `translationEnabled` is deliberately not followed here. Sub-frames get
+      // the FAB intent as a FRAME_TOGGLE message scoped to their own tab (see
+      // onMessage below); a storage listener would fire in every tab's
+      // sub-frames and never fire for a repeated ON. A frame that loads after
+      // the click still misses it — a lazily loaded iframe, or one that
+      // navigated itself.
     });
 
-    // Listen for toggles from popup
+    // Listen for toggles from popup, and for the top frame's FAB intent
+    // relayed by the background to every frame of this tab.
     chrome.runtime.onMessage.addListener((message: ContentMessage) => {
       if (message.type === 'TOGGLE_TRANSLATION') {
+        sm.handleToggle(message.enabled);
+      }
+      // The top frame already acted on its own click; only sub-frames follow.
+      if (message.type === 'FRAME_TOGGLE' && !isTopFrame) {
         sm.handleToggle(message.enabled);
       }
       if (message.type === 'TOGGLE_TRANSLATION_MODE') {

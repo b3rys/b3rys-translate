@@ -67,11 +67,13 @@ export function setupChromeMock(options: ChromeMockOptions = {}): {
   local: ReturnType<typeof createStorageArea>;
   sendMessage: ReturnType<typeof vi.fn>;
   setBadgeText: ReturnType<typeof vi.fn>;
+  tabsSendMessage: ReturnType<typeof vi.fn>;
 } {
   const sync = createStorageArea(options.syncStorage);
   const local = createStorageArea(options.localStorage);
   const sendMessage = vi.fn();
   const setBadgeText = vi.fn();
+  const tabsSendMessage = vi.fn(async () => undefined);
 
   vi.stubGlobal('chrome', {
     storage: {
@@ -87,8 +89,12 @@ export function setupChromeMock(options: ChromeMockOptions = {}): {
     action: {
       setBadgeText,
       setBadgeBackgroundColor: vi.fn(),
+      openPopup: vi.fn(async () => undefined),
+    },
+    tabs: {
+      sendMessage: tabsSendMessage,
     },
   });
 
-  return { sync, local, sendMessage, setBadgeText };
+  return { sync, local, sendMessage, setBadgeText, tabsSendMessage };
 }

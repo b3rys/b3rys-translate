@@ -6,6 +6,7 @@ import type {
   TranslateBatchResponse,
   CacheLookupResponse,
   ClearCacheResponse,
+  FrameToggleMessage,
 } from '@/utils/messaging';
 import {
   loadCache,
@@ -87,11 +88,26 @@ export default defineBackground(() => {
   chrome.runtime.onMessage.addListener(
     (
       message: BackgroundMessage,
-      _sender: chrome.runtime.MessageSender,
+      sender: chrome.runtime.MessageSender,
       sendResponse: (
         response: TranslateBatchResponse | CacheLookupResponse | ClearCacheResponse,
       ) => void,
     ) => {
+      if (message.type === 'RELAY_FRAME_TOGGLE') {
+        // Fan the top frame's FAB intent out to the sender's own tab. Without
+        // a frameId, tabs.sendMessage reaches every frame of that tab; the
+        // top frame ignores FRAME_TOGGLE itself. No sender.tab means the
+        // message did not come from a page, so there is nothing to relay to.
+        const tabId = sender.tab?.id;
+        if (tabId !== undefined) {
+          const relay: FrameToggleMessage = { type: 'FRAME_TOGGLE', enabled: message.enabled };
+          chrome.tabs.sendMessage(tabId, relay).catch(() => {
+            // A tab with no other frame listening rejects — nothing to do.
+          });
+        }
+        return false;
+      }
+
       if (message.type === 'OPEN_POPUP') {
         chrome.action.openPopup().catch(() => {
           // Fallback: some Chrome versions don't support openPopup

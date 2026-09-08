@@ -43,6 +43,23 @@ export interface ToggleAutoTranslateMessage {
 }
 
 /**
+ * Top frame → background: the FAB intent changed. The background fans it out
+ * to every frame of the sender's tab as FRAME_TOGGLE. A content script cannot
+ * address its own sub-frames directly, and a stored flag only fires
+ * storage.onChanged when its value actually changes.
+ */
+export interface RelayFrameToggleMessage {
+  type: 'RELAY_FRAME_TOGGLE';
+  enabled: boolean;
+}
+
+/** Background → every frame of one tab: apply the top frame's FAB intent. */
+export interface FrameToggleMessage {
+  type: 'FRAME_TOGGLE';
+  enabled: boolean;
+}
+
+/**
  * Pure cache read — no API call, no rate-limit slot, no usage stats.
  * Lets the content script paint cached paragraphs instantly and send
  * only the misses through TRANSLATE_BATCH.
@@ -73,10 +90,12 @@ export type BackgroundMessage =
   | TranslateBatchRequest
   | CacheLookupRequest
   | OpenPopupRequest
-  | ClearCacheRequest;
+  | ClearCacheRequest
+  | RelayFrameToggleMessage;
 export type ContentMessage =
   | ToggleTranslationMessage
   | ToggleFloatingButtonMessage
   | ToggleYtButtonMessage
   | ToggleTranslationModeMessage
-  | ToggleAutoTranslateMessage;
+  | ToggleAutoTranslateMessage
+  | FrameToggleMessage;

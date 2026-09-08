@@ -4,7 +4,10 @@ import { setupChromeMock } from './helpers/chrome-mock';
 // The paper body on neurips.cc is an <iframe src="bytez.com/read/…">, so the
 // content script has to run in sub-frames too. What it must NOT do there is
 // draw a second FAB, and what it must still do is translate when the top
-// frame's FAB is switched on.
+// frame's FAB is switched on. That intent travels as a FRAME_TOGGLE message
+// relayed by the background to the frames of that one tab — not as a stored
+// flag, which fires storage.onChanged only when its value changes and does so
+// in every tab.
 
 vi.mock('@/entrypoints/content/translator', () => ({
   translatePage: vi.fn(async () => 'ok'),
@@ -41,6 +44,17 @@ function storageListener(): (changes: Record<string, { newValue: unknown }>, are
   expect(call).toBeDefined();
   return call![0] as (changes: Record<string, { newValue: unknown }>, area: string) => void;
 }
+
+/** Deliver a runtime message to every onMessage listener the script registered */
+function deliverMessage(message: { type: string; enabled: boolean }): void {
+  const addListener = chrome.runtime.onMessage.addListener as unknown as Mock;
+  expect(addListener.mock.calls.length).toBeGreaterThan(0);
+  for (const call of addListener.mock.calls) {
+    (call[0] as (m: unknown) => void)(message);
+  }
+}
+
+const WITH_KEY = { localStorage: { selectedEngine: 'gemini', engineApiKeys: { gemini: 'k' } } };
 
 beforeEach(() => {
   vi.resetModules();
@@ -82,10 +96,8 @@ describe('content script frame coverage', () => {
     expect(document.querySelector(FAB_HOST)).toBeNull();
   });
 
-  it('translates a sub-frame when the top frame turns the FAB on', async () => {
-    setupChromeMock({
-      localStorage: { selectedEngine: 'gemini', engineApiKeys: { gemini: 'k' } },
-    });
+  it('translates a sub-frame on FRAME_TOGGLE on', async () => {
+    setupChromeMock(WITH_KEY);
     const config = await loadContentScript();
     const { translatePage } = await import('@/entrypoints/content/translator');
     pretendSubFrame();
@@ -93,36 +105,85 @@ describe('content script frame coverage', () => {
     config.main();
     expect(translatePage).not.toHaveBeenCalled();
 
-    storageListener()({ translationEnabled: { newValue: true } }, 'local');
+    deliverMessage({ type: 'FRAME_TOGGLE', enabled: true });
 
     await vi.waitFor(() => expect(translatePage).toHaveBeenCalled());
   });
 
-  it('clears a sub-frame when the top frame turns the FAB off', async () => {
-    setupChromeMock({
-      localStorage: { selectedEngine: 'gemini', engineApiKeys: { gemini: 'k' } },
-    });
+  it('clears a sub-frame on FRAME_TOGGLE off', async () => {
+    setupChromeMock(WITH_KEY);
     const config = await loadContentScript();
     const { removeAllTranslations } = await import('@/entrypoints/content/translator');
     pretendSubFrame();
 
     config.main();
-    storageListener()({ translationEnabled: { newValue: false } }, 'local');
+    deliverMessage({ type: 'FRAME_TOGGLE', enabled: false });
 
     expect(removeAllTranslations).toHaveBeenCalled();
   });
 
-  it('leaves the top frame to its own FAB — the persisted flag does not re-trigger it', async () => {
-    setupChromeMock({
-      localStorage: { selectedEngine: 'gemini', engineApiKeys: { gemini: 'k' } },
-    });
+  it('ignores FRAME_TOGGLE in the top frame — its own FAB already acted', async () => {
+    const { sendMessage } = setupChromeMock(WITH_KEY);
+    sendMessage.mockResolvedValue(undefined);
     const config = await loadContentScript();
     const { translatePage } = await import('@/entrypoints/content/translator');
 
     config.main();
-    storageListener()({ translationEnabled: { newValue: true } }, 'local');
+    deliverMessage({ type: 'FRAME_TOGGLE', enabled: true });
 
     await new Promise((r) => setTimeout(r, 20));
     expect(translatePage).not.toHaveBeenCalled();
+    // Acting on it would also relay it again — a top frame must do neither.
+    expect(sendMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'RELAY_FRAME_TOGGLE' }),
+    );
+  });
+
+  it('no longer follows the stored translationEnabled flag in a sub-frame', async () => {
+    // The flag is written by every tab's top frame; following it would wake
+    // this frame for another tab's click.
+    setupChromeMock(WITH_KEY);
+    const config = await loadContentScript();
+    const { translatePage, removeAllTranslations } =
+      await import('@/entrypoints/content/translator');
+    pretendSubFrame();
+
+    config.main();
+    storageListener()({ translationEnabled: { newValue: true } }, 'local');
+    await new Promise((r) => setTimeout(r, 20));
+    storageListener()({ translationEnabled: { newValue: false } }, 'local');
+
+    expect(translatePage).not.toHaveBeenCalled();
+    expect(removeAllTranslations).not.toHaveBeenCalled();
+  });
+
+  it('relays the FAB intent from the top frame as RELAY_FRAME_TOGGLE', async () => {
+    const { sendMessage } = setupChromeMock(WITH_KEY);
+    sendMessage.mockResolvedValue(undefined);
+    const config = await loadContentScript();
+
+    config.main();
+    // TOGGLE_TRANSLATION drives the state machine the same way a FAB click does.
+    deliverMessage({ type: 'TOGGLE_TRANSLATION', enabled: true });
+
+    await vi.waitFor(() =>
+      expect(sendMessage).toHaveBeenCalledWith({ type: 'RELAY_FRAME_TOGGLE', enabled: true }),
+    );
+  });
+
+  it('does not relay from a sub-frame', async () => {
+    const { sendMessage } = setupChromeMock(WITH_KEY);
+    sendMessage.mockResolvedValue(undefined);
+    const config = await loadContentScript();
+    const { translatePage } = await import('@/entrypoints/content/translator');
+    pretendSubFrame();
+
+    config.main();
+    deliverMessage({ type: 'FRAME_TOGGLE', enabled: true });
+
+    await vi.waitFor(() => expect(translatePage).toHaveBeenCalled());
+    expect(sendMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'RELAY_FRAME_TOGGLE' }),
+    );
   });
 });
