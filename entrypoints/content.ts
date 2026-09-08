@@ -221,6 +221,13 @@ export default defineContentScript({
       // only ever touches its own document. The state machine persists the
       // FAB's on/off intent as `translationEnabled`, so following that key is
       // what makes one click translate the iframes too.
+      //
+      // This follows the CHANGE event only, so a frame that loads after the
+      // click misses it — a lazily loaded iframe, or one that navigated itself.
+      // Reading the key on load instead would carry the previous page's value
+      // over and translate sub-frames on their own, which is auto-translate
+      // (off by default, and it costs API calls). Doing this properly needs a
+      // per-page signal rather than a stored key.
       if (!isTopFrame && changes.translationEnabled) {
         sm.handleToggle(changes.translationEnabled.newValue === true);
       }
