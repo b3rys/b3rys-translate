@@ -27,9 +27,8 @@ export interface AnthropicResponse {
  * "Empty response from Anthropic API", which names the wrong cause and sends
  * whoever debugs it looking at the network layer.
  *
- * Neither selectable Anthropic model thinks by default and the request never
- * asks one to, so this is not reachable today. It is here so that changing the
- * model surfaces a real failure instead of a misleading one.
+ * Requests explicitly disable thinking for both Haiku 4.5 and 5.5. Keep the
+ * typed-block handling so response validation does not depend on block order.
  */
 export function extractText(data: AnthropicResponse): string | undefined {
   return data.content?.find((block) => block.type === 'text')?.text;
@@ -45,6 +44,8 @@ export function assertUsable(data: AnthropicResponse): void {
   }
 }
 
+// Haiku 4.5 and 5.5 support disabled; 8192 is below their 64K/128K output limits.
+// https://platform.claude.com/docs/en/build-with-claude/thinking
 export const anthropicEngine: TranslationEngine = {
   async translate(apiKey, paragraphs, mode, subtitleContext, lang, modelId, catalog) {
     const model = resolveSelectedModel('anthropic', modelId, catalog);
@@ -62,6 +63,7 @@ export const anthropicEngine: TranslationEngine = {
           body: JSON.stringify({
             model,
             max_tokens: 8192,
+            thinking: { type: 'disabled' },
             messages: [{ role: 'user', content: prompt }],
           }),
         }),
@@ -99,6 +101,7 @@ export const anthropicEngine: TranslationEngine = {
         body: JSON.stringify({
           model,
           max_tokens: 8192,
+          thinking: { type: 'disabled' },
           messages: [{ role: 'user', content: prompt }],
         }),
       }),

@@ -53,7 +53,7 @@ describe('Upstage Solar engine', () => {
     expect(mock).toHaveBeenCalledTimes(1);
   });
 
-  it('does not send reasoning_effort — Upstage documents that solar-mini ignores it', async () => {
+  it('does not send reasoning_effort — solar-mini4 defaults to reasoning off', async () => {
     const mock = stubFetch(translationBody());
 
     await upstageEngine.translate('k', [{ id: 'p1', text: 'Hello.' }], 'page');
@@ -61,7 +61,7 @@ describe('Upstage Solar engine', () => {
     const body = sentBody(mock);
     expect(body).not.toHaveProperty('reasoning_effort');
     expect(body.temperature).toBe(0.1);
-    expect(body.model).toBe('solar-mini');
+    expect(body.model).toBe('solar-mini4');
   });
 
   it.each([['page' as const], ['word' as const], ['sentence' as const], ['subtitle' as const]])(
@@ -137,10 +137,10 @@ describe('Upstage Solar engine', () => {
       'page',
       undefined,
       { sourceLang: 'en', targetLang: 'ko' },
-      'solar-mini',
+      'solar-mini4',
     );
 
-    expect(sentBody(mock).model).toBe('solar-mini');
+    expect(sentBody(mock).model).toBe('solar-mini4');
   });
 });
 
@@ -151,19 +151,13 @@ describe('Upstage catalog wiring', () => {
 
   it('offers exactly one Upstage model and defaults to it', () => {
     const models = getModelsForEngine('upstage');
-    expect(models.map((m) => m.id)).toEqual(['solar-mini']);
-    expect(DEFAULT_MODEL_IDS.upstage).toBe('solar-mini');
+    expect(models.map((m) => m.id)).toEqual(['solar-mini4']);
+    expect(DEFAULT_MODEL_IDS.upstage).toBe('solar-mini4');
   });
 
-  it('prices Solar Mini below every other model we offer', () => {
-    // 채택 근거가 "제일 싸다" 이므로 그 전제를 고정해둔다. 다른 모델이 더 싸지면
-    // 이 테스트가 깨지고, 그때 다시 판단하면 된다.
+  it('uses Solar Mini 4 standard list prices, not a temporary promotion', () => {
     const usage = { inputTokens: 1_000_000, outputTokens: 1_000_000 };
-    const solar = calculateModelCost('solar-mini', usage);
-    const others = (
-      ['gemini-3.1-flash-lite', 'gpt-5.4-nano', 'claude-haiku-4-5-20251001'] as const
-    ).map((id) => calculateModelCost(id, usage));
-
-    expect(others.every((cost) => cost > solar)).toBe(true);
+    expect(calculateModelCost('solar-mini4', usage)).toBe(0.5);
+    expect(getModelsForEngine('upstage')[0].pricing).toEqual({ input: 0.1, output: 0.4 });
   });
 });

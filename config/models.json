@@ -9,7 +9,8 @@
         "input": 0.25,
         "output": 1.5
       },
-      "default": true
+      "default": true,
+      "note": "추론 완전 off 불가, minimal 예외 허용(팀장 승인 10/11)"
     },
     {
       "id": "gpt-5.4-nano",
@@ -42,14 +43,37 @@
       "default": true
     },
     {
-      "id": "solar-mini",
+      "id": "solar-mini4",
       "engine": "upstage",
-      "label": "Upstage Solar Mini",
+      "label": "Upstage Solar Mini 4",
       "pricing": {
-        "input": 0.15,
-        "output": 0.15
+        "input": 0.1,
+        "output": 0.4
       },
-      "default": true
+      "default": true,
+      "note": "정가 기준. reasoning_effort 생략 시 off. solar-mini 종료에 따른 후속 기본 모델."
+    },
+    {
+      "id": "gpt-6-luna",
+      "engine": "openai",
+      "label": "GPT-6 Luna",
+      "pricing": {
+        "input": 0.1,
+        "output": 0.5
+      },
+      "default": false,
+      "note": "입력 272K 이하 Standard 가격. 초과 시 전체 요청 입력 0.20/출력 0.75 USD per 1M tokens. 장문 가격 분기는 아직 미구현."
+    },
+    {
+      "id": "claude-haiku-5-5",
+      "engine": "anthropic",
+      "label": "Claude Haiku 5.5",
+      "pricing": {
+        "input": 0.1,
+        "output": 0.5
+      },
+      "default": false,
+      "note": "입력 100K 이하 Standard 가격. 초과 시 입력 0.50/출력 2.50 USD per 1M tokens. 장문 가격 분기는 아직 미구현. thinking disabled 명시 필요."
     }
   ]
 }

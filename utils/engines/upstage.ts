@@ -14,8 +14,9 @@ import {
 /**
  * Upstage Solar — an OpenAI-compatible chat endpoint, so the request shape is
  * the same as `openai.ts`, minus `reasoning_effort`: Upstage documents that
- * solar-mini does not support reasoning and ignores that parameter. Sending it
- * would only imply a control we don't actually have.
+ * solar-mini4 leaves reasoning off when the parameter is omitted. Legacy
+ * solar-mini rejects any reasoning_effort value with HTTP 400 (not ignored).
+ * https://console.upstage.ai/docs/capabilities/generate/reasoning
  *
  * `temperature: 0.1` matches what the other engines use for translation — we
  * want the same sentence back every time, not variety.

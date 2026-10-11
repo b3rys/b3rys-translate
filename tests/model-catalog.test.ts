@@ -9,23 +9,24 @@ import {
 } from '@/utils/models';
 
 describe('model catalog', () => {
-  it('exposes only label-only, non-thinking model choices per provider', () => {
+  it('exposes only label-only, explicitly configured model choices per provider', () => {
     expect(getModelsForEngine('openai').map((model) => model.label)).toEqual([
       'GPT-5.4 Nano',
       'GPT-5.6 Luna',
+      'GPT-6 Luna',
     ]);
     expect(getModelsForEngine('gemini').map((model) => model.label)).toEqual([
       'Gemini 3.1 Flash Lite',
     ]);
     expect(getModelsForEngine('anthropic').map((model) => model.label)).toEqual([
       'Claude Haiku 4.5',
+      'Claude Haiku 5.5',
     ]);
     expect(getModelsForEngine('upstage').map((model) => model.label)).toEqual([
-      'Upstage Solar Mini',
+      'Upstage Solar Mini 4',
     ]);
-    // 5개다. Gemini 3.5 Flash Lite 는 씽킹을 끌 수 없어 제외했다(config/README.md).
-    // Upstage Solar Mini 는 공급사가 "reasoning 미지원"을 명시해 통과했다.
-    expect(MODEL_CATALOG).toHaveLength(5);
+    // Seven choices; Gemini 3.1 remains a documented minimal-thinking exception.
+    expect(MODEL_CATALOG).toHaveLength(7);
   });
 
   it('migrates users without a saved model to each provider economy model', () => {
@@ -33,12 +34,12 @@ describe('model catalog', () => {
       gemini: 'gemini-3.1-flash-lite',
       openai: 'gpt-5.4-nano',
       anthropic: 'claude-haiku-4-5-20251001',
-      upstage: 'solar-mini',
+      upstage: 'solar-mini4',
     });
     expect(resolveSelectedModel('gemini')).toBe('gemini-3.1-flash-lite');
     expect(resolveSelectedModel('openai')).toBe('gpt-5.4-nano');
     expect(resolveSelectedModel('anthropic')).toBe('claude-haiku-4-5-20251001');
-    expect(resolveSelectedModel('upstage')).toBe('solar-mini');
+    expect(resolveSelectedModel('upstage')).toBe('solar-mini4');
   });
 
   it('rejects a model saved under the wrong provider and falls back safely', () => {

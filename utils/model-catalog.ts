@@ -10,6 +10,7 @@ export interface ModelConfig {
   readonly label: string;
   readonly pricing: Readonly<{ input: number; output: number }>;
   readonly default: boolean;
+  readonly note?: string;
 }
 
 export interface ModelCatalog {
@@ -90,6 +91,7 @@ function parseModels(raw: unknown, diagnostics: string[]): ModelConfig[] {
         label: item.label,
         pricing: Object.freeze({ input: item.pricing.input, output: item.pricing.output }),
         default: item.default,
+        ...(typeof item.note === 'string' ? { note: item.note } : {}),
       }),
     );
   });

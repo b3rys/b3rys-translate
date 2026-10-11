@@ -31,7 +31,7 @@ function assertInvariants(raw: unknown) {
 describe('source-independent catalog loader', () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it('pins the complete bundled ids, labels, prices and defaults before extraction', () => {
+  it('pins the complete bundled ids, labels, prices and defaults for the current bundle', () => {
     expect(baseline.version).toBe(1);
     expect(baseline.diagnostics).toEqual([]);
     expect(
@@ -47,14 +47,16 @@ describe('source-independent catalog loader', () => {
       ['gemini-3.1-flash-lite', 'gemini', 'Gemini 3.1 Flash Lite', 0.25, 1.5, true],
       ['gpt-5.4-nano', 'openai', 'GPT-5.4 Nano', 0.2, 1.25, true],
       ['gpt-5.6-luna', 'openai', 'GPT-5.6 Luna', 0.2, 1.2, false],
+      ['gpt-6-luna', 'openai', 'GPT-6 Luna', 0.1, 0.5, false],
       ['claude-haiku-4-5-20251001', 'anthropic', 'Claude Haiku 4.5', 1, 5, true],
-      ['solar-mini', 'upstage', 'Upstage Solar Mini', 0.15, 0.15, true],
+      ['claude-haiku-5-5', 'anthropic', 'Claude Haiku 5.5', 0.1, 0.5, false],
+      ['solar-mini4', 'upstage', 'Upstage Solar Mini 4', 0.1, 0.4, true],
     ]);
     expect(baseline.defaultModelIds).toEqual({
       gemini: 'gemini-3.1-flash-lite',
       openai: 'gpt-5.4-nano',
       anthropic: 'claude-haiku-4-5-20251001',
-      upstage: 'solar-mini',
+      upstage: 'solar-mini4',
     });
   });
 
@@ -118,7 +120,10 @@ describe('source-independent catalog loader', () => {
       Reflect.set(raw.models[2].pricing, 'input', value);
       const catalog = assertInvariants(raw);
       // A bad optional item is discarded; the valid default survives without whole-engine fallback.
-      expect(getModelsForEngine('openai', catalog).map((m) => m.id)).toEqual(['gpt-5.4-nano']);
+      expect(getModelsForEngine('openai', catalog).map((m) => m.id)).toEqual([
+        'gpt-5.4-nano',
+        'gpt-6-luna',
+      ]);
       expect(catalog.diagnostics.some((message) => message.includes('price'))).toBe(true);
     },
   );
@@ -155,19 +160,20 @@ describe('source-independent catalog loader', () => {
     ]) {
       const raw = clone();
       change(raw.models[2]);
-      expect(getModelsForEngine('openai', assertInvariants(raw))).toHaveLength(1);
+      expect(getModelsForEngine('openai', assertInvariants(raw))).toHaveLength(2);
     }
     const raw = clone();
     raw.models.push(structuredClone(raw.models[2]));
     expect(getModelsForEngine('openai', assertInvariants(raw)).map((m) => m.id)).toEqual([
       'gpt-5.4-nano',
+      'gpt-6-luna',
     ]);
     expect(assertInvariants({ version: 1, models: [null, 42] }).models).toEqual(baseline.models);
   });
 
   it('keeps fallback ids unique even when an input moves a bundled id to another engine', () => {
     const raw = clone();
-    raw.models = [{ ...raw.models[0], id: 'solar-mini' }];
+    raw.models = [{ ...raw.models[0], id: 'solar-mini4' }];
     expect(assertInvariants(raw).models).toEqual(baseline.models);
   });
 
@@ -182,9 +188,9 @@ describe('source-independent catalog loader', () => {
     };
     const catalog = assertInvariants(raw);
     expect(resolveSelectedModel('openai', 'gpt-5.4-nano', catalog)).toBe('new-openai-model');
-    expect(resolveSelectedModel('openai', 'solar-mini', catalog)).toBe('new-openai-model');
+    expect(resolveSelectedModel('openai', 'solar-mini4', catalog)).toBe('new-openai-model');
     expect(
-      normalizeSelectedModels({ openai: 'gpt-5.6-luna', upstage: 'solar-mini' }, catalog),
+      normalizeSelectedModels({ openai: 'gpt-5.6-luna', upstage: 'solar-mini4' }, catalog),
     ).toEqual({ ...baseline.defaultModelIds, openai: 'new-openai-model' });
     expect(getModelConfig('new-openai-model', catalog).pricing).toEqual({ input: 2, output: 3 });
     expect(() => getModelConfig('gpt-5.4-nano', catalog)).toThrow('Unknown model');

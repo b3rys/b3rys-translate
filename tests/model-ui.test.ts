@@ -14,8 +14,10 @@ describe('popup model UI', () => {
       'Gemini 3.1 Flash Lite',
       'GPT-5.4 Nano',
       'GPT-5.6 Luna',
+      'GPT-6 Luna',
       'Claude Haiku 4.5',
-      'Upstage Solar Mini',
+      'Claude Haiku 5.5',
+      'Upstage Solar Mini 4',
     ]);
   });
 

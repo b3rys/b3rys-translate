@@ -43,7 +43,7 @@ describe('popup model wiring', () => {
     const badge = document.querySelector('.badge-model') as HTMLElement;
 
     await vi.waitFor(() => {
-      expect(select.options).toHaveLength(5);
+      expect(select.options).toHaveLength(7);
       expect(select.value).toBe('gpt-5.6-luna');
       expect(apiKey.value).toBe('••••••••1234');
       expect(badge.textContent).toBe('GPT-5.6 Luna');
@@ -58,7 +58,7 @@ describe('popup model wiring', () => {
         gemini: 'gemini-3.1-flash-lite',
         openai: 'gpt-5.4-nano',
         anthropic: 'claude-haiku-4-5-20251001',
-        upstage: 'solar-mini',
+        upstage: 'solar-mini4',
       });
       expect(mock.local._data.get('engineApiKeys')).toEqual({
         gemini: 'gemini-existing-key',
