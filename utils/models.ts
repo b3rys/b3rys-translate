@@ -12,6 +12,14 @@ export type SelectedModels = Partial<Record<EngineType, ModelId>>;
 export type NormalizedSelectedModels = Record<EngineType, ModelId>;
 export const SELECTED_MODELS_KEY = 'selectedModels';
 
+// Explicit one-step replacements, ready to move into catalog migrations data.
+export const MODEL_MIGRATIONS: readonly { from: ModelId; to: ModelId }[] = [
+  { from: 'gpt-5.4-nano', to: 'gpt-6-luna' },
+  { from: 'gpt-5.6-luna', to: 'gpt-6-luna' },
+  { from: 'claude-haiku-4-5-20251001', to: 'claude-haiku-5-5' },
+  { from: 'solar-mini', to: 'solar-mini4' },
+];
+
 export const modelCatalog = loadModelCatalog(bundledModels);
 for (const message of modelCatalog.diagnostics) dbg('model-catalog', message);
 
@@ -49,7 +57,8 @@ export function resolveSelectedModel(
   savedModel?: string,
   catalog: ModelCatalog = modelCatalog,
 ): ModelId {
-  const model = catalog.models.find((model) => model.id === savedModel);
+  const migratedId = MODEL_MIGRATIONS.find(({ from }) => from === savedModel)?.to ?? savedModel;
+  const model = catalog.models.find((model) => model.id === migratedId);
   return model?.engine === engine ? model.id : catalog.defaultModelIds[engine];
 }
 

@@ -14,6 +14,8 @@ mutants = [
     ("omit-gemini-thinking-cost", "utils/engines/gemini.ts", "(data.usageMetadata.thoughtsTokenCount ?? 0)", "0", 1),
     ("retain-retired-selection", "utils/models.ts", "return model?.engine === engine ? model.id : catalog.defaultModelIds[engine];", "return savedModel ?? catalog.defaultModelIds[engine];", 1),
     ("send-solar-reasoning", "utils/engines/upstage.ts", "temperature: TEMPERATURE,", "temperature: TEMPERATURE, reasoning_effort: 'high',", 1),
+    ("ignore-explicit-migrations", "utils/models.ts", "MODEL_MIGRATIONS.find(({ from }) => from === savedModel)?.to ?? savedModel", "savedModel", 1),
+    ("share-model-cache", "utils/translation-context.ts", "${modelId}", "shared-model", 1),
 ]
 with tempfile.TemporaryDirectory(prefix="model-catalog-mutants-") as tmp:
     work = Path(tmp)
@@ -26,7 +28,7 @@ with tempfile.TemporaryDirectory(prefix="model-catalog-mutants-") as tmp:
     def run(label, should_fail):
         report = work / "result.json"
         result = subprocess.run([
-            str(work / "node_modules/.bin/vitest"), "run", "tests/model-catalog-loader.test.ts", "tests/model-refresh.test.ts",
+            str(work / "node_modules/.bin/vitest"), "run", "tests/model-catalog-loader.test.ts", "tests/model-refresh.test.ts", "tests/model-cache-migration.test.ts",
             "--reporter=json", "--outputFile", str(report),
         ], cwd=work, capture_output=True, text=True)
         if not report.exists():

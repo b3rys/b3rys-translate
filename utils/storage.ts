@@ -68,9 +68,8 @@ export async function migrateStorage(): Promise<void> {
   }>(['engineApiKeys', SELECTED_MODELS_KEY, 'selectedEngine']);
   const localKeys: Partial<Record<EngineType, string>> = localData.engineApiKeys || {};
 
-  // Existing users had provider selection only. Persist each provider's economy
-  // model as the migration default while preserving any model choices already
-  // saved by a newer version.
+  // Persist explicit model replacements and fill missing/invalid selections
+  // with engine defaults. Already-current choices are preserved on repeat runs.
   const selectedModels = normalizeSelectedModels(localData.selectedModels);
   if (JSON.stringify(selectedModels) !== JSON.stringify(localData.selectedModels || {})) {
     await chrome.storage.local.set({ [SELECTED_MODELS_KEY]: selectedModels });

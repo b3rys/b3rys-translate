@@ -65,10 +65,10 @@
   [추론 문서](https://console.upstage.ai/docs/capabilities/generate/reasoning)에 따라
   reasoning 파라미터를 생략한다. 임시 할인 가격은 쓰지 않는다.
 - [GPT-6 Luna](https://developers.openai.com/api/docs/models/gpt-6-luna): 입력 272K 이하
-  0.10/0.50. 초과 시 전체 요청 0.20/0.75다. 기존 nano와 5.6 Luna 및 기본값을 유지한다.
+  0.10/0.50. 초과 시 전체 요청 0.20/0.75다. nano와 5.6 Luna를 제거하고 기본값을 GPT-6 Luna로 바꾼다.
   `reasoning_effort: none`은 두 요청 경로에서 유지한다.
 - [Haiku 5.5](https://platform.claude.com/docs/en/models/haiku-5-5/overview): 입력 100K 이하
-  0.10/0.50, 초과 시 0.50/2.50. 기본값은 4.5를 유지한다.
+  0.10/0.50, 초과 시 0.50/2.50. 4.5를 제거하고 기본값을 5.5로 바꾼다.
   [thinking 문서](https://platform.claude.com/docs/en/build-with-claude/thinking)상
   4.5·5.5 모두 disabled가 가능하다. 5.5 기본 effort medium은 disabled 허용 범위다.
   출력 한도는 각각 64K/128K이므로 현재 요청 제한 8192를 유지한다.
@@ -82,3 +82,15 @@ GPT-6 Luna와 Haiku 5.5의 장문 가격 분기는 이번 범위에서 구현하
 표시·계산은 위 짧은 입력 단가 기준이며, 해당 입력 임계치를 넘는 요청 비용은 과소 추정된다.
 `note`는 검증된 카탈로그에 보존하는 설명용 메타데이터이며 요청 옵션을 실행하지 않는다.
 실제 API 호출·계정 접근성·번역 품질·지연은 별도 검증 대상이다.
+
+### 모든 구형 선택 이전
+
+직접 선택 여부와 관계없이 OpenAI Nano·5.6 Luna → GPT-6 Luna,
+Haiku 4.5 → Haiku 5.5, Solar Mini → Solar Mini4로 이전한다. Gemini는 유지한다.
+`utils/models.ts`의 `MODEL_MIGRATIONS`는 `{from, to}` 배열이며 원격 단계에서
+`models.json`의 `migrations`로 옮길 수 있도록 분리했다. 이번에는 원격 입력을 받지 않는다.
+이전 대상은 카탈로그에 존재하고 같은 엔진일 때만 사용하며, 모르는 값이나 유효하지 않은
+대상은 엔진 기본값으로 복구한다. `migrateStorage`가 새 ID를 저장하므로 다음 실행에도 유지된다.
+팝업은 공급사 전체를 선택하는 한 메뉴에 네 모델을 표시한다. 다시 여러 모델이 추가돼도
+동작하도록 선택 메뉴 자체는 유지한다. 캐시 키에 모델 ID가 있으므로 이전 모델의 캐시는
+새 모델에 사용되지 않는다. 과거 비용 통계는 모델별로 보존한다.

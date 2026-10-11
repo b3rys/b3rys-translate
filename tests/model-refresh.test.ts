@@ -1,3 +1,6 @@
+import { loadModelCatalog } from '@/utils/model-catalog';
+import bundled from '@/config/models.json';
+import type { EngineType } from '@/utils/engines/types';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { anthropicEngine } from '@/utils/engines/anthropic';
 import { geminiEngine } from '@/utils/engines/gemini';
@@ -8,6 +11,8 @@ import {
   DEFAULT_MODEL_IDS,
   getModelConfig,
   MODEL_CATALOG,
+  MODEL_MIGRATIONS,
+  resolveSelectedModel,
 } from '@/utils/models';
 import { getSettings, migrateStorage } from '@/utils/storage';
 import { setupChromeMock } from './helpers/chrome-mock';
@@ -33,11 +38,11 @@ afterEach(() => {
 });
 
 describe('0.5.37 model refresh', () => {
-  it('adds evaluation candidates without changing OpenAI or Anthropic defaults', () => {
+  it('ships exactly four default models and removes all replaced choices', () => {
     expect(DEFAULT_MODEL_IDS).toEqual({
       gemini: 'gemini-3.1-flash-lite',
-      openai: 'gpt-5.4-nano',
-      anthropic: 'claude-haiku-4-5-20251001',
+      openai: 'gpt-6-luna',
+      anthropic: 'claude-haiku-5-5',
       upstage: 'solar-mini4',
     });
     expect(MODEL_CATALOG.map((m) => m.id)).not.toContain('solar-mini');
@@ -48,7 +53,62 @@ describe('0.5.37 model refresh', () => {
     );
   });
 
-  it('migrates legacy Solar selection once, retaining other choices, keys and historical usage', async () => {
+  const migrations: [EngineType, string, string][] = [
+    ['openai', 'gpt-5.4-nano', 'gpt-6-luna'],
+    ['openai', 'gpt-5.6-luna', 'gpt-6-luna'],
+    ['anthropic', 'claude-haiku-4-5-20251001', 'claude-haiku-5-5'],
+    ['upstage', 'solar-mini', 'solar-mini4'],
+  ];
+
+  it.each(migrations)(
+    'persists %s selection %s as %s and keeps it on a second save',
+    async (engine, from, to) => {
+      const mock = setupChromeMock({
+        localStorage: { selectedEngine: engine, selectedModels: { [engine]: from } },
+      });
+      expect((await getSettings()).selectedModels[engine]).toBe(to);
+      await migrateStorage();
+      const persisted = mock.local._data.get('selectedModels') as Record<string, string>;
+      expect(persisted[engine]).toBe(to);
+      await chrome.storage.local.set({ selectedModels: { ...persisted } });
+      await migrateStorage();
+      expect((await getSettings()).selectedModels[engine]).toBe(to);
+      expect(MODEL_CATALOG.some((m) => m.id === from)).toBe(false);
+    },
+  );
+
+  it('persists engine defaults for unknown values', async () => {
+    const mock = setupChromeMock({
+      localStorage: {
+        selectedModels: {
+          openai: 'unknown',
+          anthropic: 'unknown',
+          upstage: 'unknown',
+          gemini: 'unknown',
+        },
+      },
+    });
+    await migrateStorage();
+    expect(mock.local._data.get('selectedModels')).toEqual(DEFAULT_MODEL_IDS);
+  });
+
+  it('uses explicit migration targets, not whichever model is currently default', () => {
+    expect(MODEL_MIGRATIONS).toEqual(migrations.map(([, from, to]) => ({ from, to })));
+    const raw = structuredClone(bundled);
+    for (const engine of ['openai', 'anthropic', 'upstage']) {
+      const target = raw.models.find((m) => m.engine === engine)!;
+      target.default = false;
+      raw.models.push({ ...target, id: `alternate-${engine}`, default: true });
+    }
+    const catalog = loadModelCatalog(raw);
+    for (const [engine, from, to] of migrations) {
+      expect(resolveSelectedModel(engine, from, catalog)).toBe(to);
+      expect(resolveSelectedModel(engine, 'unknown', catalog)).toBe(`alternate-${engine}`);
+    }
+    expect(resolveSelectedModel('anthropic', 'gpt-5.4-nano', catalog)).toBe('alternate-anthropic');
+  });
+
+  it('migrates legacy Solar selection once, upgrading other legacy choices and retaining keys and historical usage', async () => {
     const history = {
       'solar-mini': { inputTokens: 10, outputTokens: 20, estimatedCost: 0.003, requestCount: 1 },
     };
@@ -71,8 +131,8 @@ describe('0.5.37 model refresh', () => {
     await migrateStorage();
     expect(mock.local._data.get('selectedModels')).toEqual({
       gemini: 'gemini-3.1-flash-lite',
-      openai: 'gpt-5.6-luna',
-      anthropic: 'claude-haiku-4-5-20251001',
+      openai: 'gpt-6-luna',
+      anthropic: 'claude-haiku-5-5',
       upstage: 'solar-mini4',
     });
     expect(mock.local._data.get('selectedEngine')).toBe('upstage');
@@ -84,9 +144,9 @@ describe('0.5.37 model refresh', () => {
   });
 
   it.each(['page', 'segment'] as const)(
-    'disables Haiku thinking in the %s request for both selectable versions',
+    'disables Haiku thinking in the %s request for the current version',
     async (mode) => {
-      for (const model of ['claude-haiku-4-5-20251001', 'claude-haiku-5-5']) {
+      for (const model of ['claude-haiku-5-5']) {
         const mock = mockResponse({ content: [{ type: 'text', text: '[1] 번역' }] });
         await anthropicEngine.translate(
           'fixture-key',

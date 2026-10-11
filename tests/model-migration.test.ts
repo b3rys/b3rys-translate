@@ -23,7 +23,7 @@ describe('model selection migration', () => {
     expect(mock.local._data.get('engineApiKeys')).toEqual({ openai: 'existing-key' });
   });
 
-  it('repairs a retired model and one saved under the wrong provider, keeping valid choices', async () => {
+  it('repairs retired selections and models saved under the wrong provider', async () => {
     // gemini-3.5-flash-lite 는 목록에서 제거된 모델이다(씽킹을 끌 수 없어서).
     // 제거 전에 그것을 골라둔 사용자가 실제로 있으므로, 저장값이 그대로 남아
     // 지원하지 않는 모델로 호출이 나가면 안 된다. 기본값으로 복구돼야 한다.
@@ -44,7 +44,7 @@ describe('model selection migration', () => {
     expect(mock.local._data.get(SELECTED_MODELS_KEY)).toEqual({
       gemini: DEFAULT_MODEL_IDS.gemini, // 제거된 모델 → 기본값으로 복구
       openai: DEFAULT_MODEL_IDS.openai, // 다른 제공사 모델 → 기본값으로 복구
-      anthropic: DEFAULT_MODEL_IDS.anthropic, // 유효한 선택 → 보존
+      anthropic: DEFAULT_MODEL_IDS.anthropic, // 교체 대상 → 후속 모델
       upstage: DEFAULT_MODEL_IDS.upstage, // 저장값 없음 → 기본값
     });
     expect(mock.local._data.get('selectedEngine')).toBe('anthropic');
