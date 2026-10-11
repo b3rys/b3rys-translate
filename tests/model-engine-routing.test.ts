@@ -18,7 +18,7 @@ describe('model-aware engine requests', () => {
     vi.unstubAllGlobals();
   });
 
-  it('routes GPT-5.6 Luna with reasoning disabled and no temperature override', async () => {
+  it('routes GPT-6 Luna with reasoning disabled and no temperature override', async () => {
     const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
       okOpenAIResponse(),
     );
@@ -30,12 +30,12 @@ describe('model-aware engine requests', () => {
       'sentence',
       undefined,
       { sourceLang: 'en', targetLang: 'ko' },
-      'gpt-5.6-luna',
+      'gpt-6-luna',
     );
 
     const init = fetchMock.mock.calls[0][1] as RequestInit;
     const body = JSON.parse(init.body as string);
-    expect(body.model).toBe('gpt-5.6-luna');
+    expect(body.model).toBe('gpt-6-luna');
     expect(body.reasoning_effort).toBe('none');
     expect(body).not.toHaveProperty('temperature');
     expect(body.messages[0].content).toContain(
@@ -80,7 +80,7 @@ describe('model-aware engine requests', () => {
     expect(body.contents[0].parts[0].text).not.toContain('※');
   });
 
-  it('routes Claude Haiku 4.5 through the existing Messages API contract', async () => {
+  it('routes Claude Haiku 5.5 through the existing Messages API contract', async () => {
     const fetchMock = vi.fn(
       async (_input: RequestInfo | URL, _init?: RequestInit) =>
         new Response(
@@ -99,12 +99,12 @@ describe('model-aware engine requests', () => {
       'sentence',
       undefined,
       { sourceLang: 'en', targetLang: 'ko' },
-      'claude-haiku-4-5-20251001',
+      'claude-haiku-5-5',
     );
 
     const init = fetchMock.mock.calls[0][1] as RequestInit;
     const body = JSON.parse(init.body as string);
-    expect(body.model).toBe('claude-haiku-4-5-20251001');
+    expect(body.model).toBe('claude-haiku-5-5');
     expect(body.messages[0].content).toContain(
       'Translate each numbered sentence or paragraph below into Korean',
     );

@@ -1,0 +1,85 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`0.5.37 model refresh > disables Haiku thinking in the page request for the current version > page-claude-haiku-5-5 1`] = `
+{
+  "max_tokens": 8192,
+  "messages": [
+    {
+      "content": Any<String>,
+      "role": "user",
+    },
+  ],
+  "model": "claude-haiku-5-5",
+  "thinking": {
+    "type": "disabled",
+  },
+}
+`;
+
+exports[`0.5.37 model refresh > disables Haiku thinking in the segment request for the current version > segment-claude-haiku-5-5 1`] = `
+{
+  "max_tokens": 8192,
+  "messages": [
+    {
+      "content": Any<String>,
+      "role": "user",
+    },
+  ],
+  "model": "claude-haiku-5-5",
+  "thinking": {
+    "type": "disabled",
+  },
+}
+`;
+
+exports[`0.5.37 model refresh > keeps GPT-6 Luna reasoning none in the page request 1`] = `
+{
+  "messages": [
+    {
+      "content": Any<String>,
+      "role": "user",
+    },
+  ],
+  "model": "gpt-6-luna",
+  "reasoning_effort": "none",
+}
+`;
+
+exports[`0.5.37 model refresh > keeps GPT-6 Luna reasoning none in the segment request 1`] = `
+{
+  "messages": [
+    {
+      "content": Any<String>,
+      "role": "user",
+    },
+  ],
+  "model": "gpt-6-luna",
+  "reasoning_effort": "none",
+}
+`;
+
+exports[`0.5.37 model refresh > keeps Solar Mini 4 reasoning absent in the page request 1`] = `
+{
+  "messages": [
+    {
+      "content": Any<String>,
+      "role": "user",
+    },
+  ],
+  "model": "solar-mini4",
+  "temperature": 0.1,
+}
+`;
+
+exports[`0.5.37 model refresh > keeps Solar Mini 4 reasoning absent in the segment request 1`] = `
+{
+  "messages": [
+    {
+      "content": Any<String>,
+      "role": "user",
+    },
+  ],
+  "model": "solar-mini4",
+  "temperature": 0.1,
+}
+`;

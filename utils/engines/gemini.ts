@@ -21,6 +21,7 @@ interface GeminiResponse {
   usageMetadata?: {
     promptTokenCount?: number;
     candidatesTokenCount?: number;
+    thoughtsTokenCount?: number;
   };
   error?: { message: string; code: number };
 }
@@ -71,7 +72,11 @@ async function callGeminiAPI(
   const usage: UsageData | undefined = data.usageMetadata
     ? {
         inputTokens: data.usageMetadata.promptTokenCount ?? 0,
-        outputTokens: data.usageMetadata.candidatesTokenCount ?? 0,
+        // Thinking is billed at the output rate, in addition to candidate tokens.
+        // https://ai.google.dev/gemini-api/docs/generate-content/thinking#pricing
+        outputTokens:
+          (data.usageMetadata.candidatesTokenCount ?? 0) +
+          (data.usageMetadata.thoughtsTokenCount ?? 0),
       }
     : undefined;
 

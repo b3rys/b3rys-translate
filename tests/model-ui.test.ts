@@ -12,10 +12,9 @@ describe('popup model UI', () => {
 
     expect(Array.from(select.options).map((option) => option.textContent)).toEqual([
       'Gemini 3.1 Flash Lite',
-      'GPT-5.4 Nano',
-      'GPT-5.6 Luna',
-      'Claude Haiku 4.5',
-      'Upstage Solar Mini',
+      'GPT-6 Luna',
+      'Claude Haiku 5.5',
+      'Upstage Solar Mini 4',
     ]);
   });
 
@@ -23,7 +22,7 @@ describe('popup model UI', () => {
     const tooltip = document.getElementById('pricing') as HTMLElement;
     renderModelPricingTable(tooltip);
 
-    expect(tooltip.textContent).toContain('GPT-5.6 Luna');
+    expect(tooltip.textContent).toContain('GPT-6 Luna');
     expect(tooltip.textContent).toContain('Input / Output · USD per 1M tokens');
     expect(tooltip.textContent).not.toContain('저비용');
     expect(tooltip.textContent).not.toContain('고품질');
