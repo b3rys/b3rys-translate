@@ -1,5 +1,6 @@
 import type { FloatingButtonState, TranslationMode } from '@/types';
 import css from './floating-button.css?raw';
+import { mountPersistentUiHost } from './persistent-ui-host';
 
 const ICONS = {
   translate: `<svg viewBox="0 0 20 20" fill="none" class="icon icon-translate">
@@ -110,7 +111,7 @@ export function createFloatingButton(onClick: () => void): FloatingButton {
   wrap.appendChild(fab);
   wrap.appendChild(modeBtn);
   shadow.appendChild(wrap);
-  document.body.appendChild(host);
+  const unmountHost = mountPersistentUiHost(host);
 
   // Draggable vertically
   let isDragging = false;
@@ -225,7 +226,7 @@ export function createFloatingButton(onClick: () => void): FloatingButton {
     },
 
     destroy() {
-      host.remove();
+      unmountHost();
     },
   };
 }

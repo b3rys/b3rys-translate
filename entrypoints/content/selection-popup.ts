@@ -7,6 +7,7 @@ import {
 } from '@/utils/constants';
 import css from './selection-popup.css?raw';
 import { isContextInvalidated, markContextInvalidated } from './context-invalidated';
+import { mountPersistentUiHost } from './persistent-ui-host';
 
 const TRIGGER_ICON = `<svg viewBox="0 0 20 20" fill="none">
   <text x="10" y="11" text-anchor="middle" font-family="-apple-system,sans-serif" font-size="14" font-weight="800" fill="currentColor">A</text>
@@ -140,6 +141,7 @@ function warmUpVoices(): void {
 }
 
 let host: HTMLDivElement | null = null;
+let unmountHost: (() => void) | null = null;
 let shadowRoot: ShadowRoot | null = null;
 let triggerEl: HTMLButtonElement | null = null;
 let popupEl: HTMLDivElement | null = null;
@@ -236,7 +238,7 @@ function ensureShadowRoot(): ShadowRoot {
   style.textContent = css;
   shadowRoot.appendChild(style);
 
-  document.body.appendChild(host);
+  unmountHost = mountPersistentUiHost(host);
   return shadowRoot;
 }
 
@@ -756,7 +758,8 @@ export function destroySelectionPopup(): void {
   window.removeEventListener('resize', onResize);
 
   closeAll();
-  host?.remove();
+  unmountHost?.();
+  unmountHost = null;
   host = null;
   shadowRoot = null;
 }
