@@ -26,6 +26,8 @@ interface ContentScriptConfig {
 }
 
 const FAB_HOST = '#b3rys-translate-root';
+const NativeMutationObserver = MutationObserver;
+const observers: MutationObserver[] = [];
 
 async function loadContentScript(): Promise<ContentScriptConfig> {
   vi.stubGlobal('defineContentScript', (config: ContentScriptConfig) => config);
@@ -60,10 +62,20 @@ beforeEach(() => {
   vi.resetModules();
   vi.clearAllMocks();
   document.body.innerHTML = '';
+  vi.stubGlobal(
+    'MutationObserver',
+    class extends NativeMutationObserver {
+      constructor(callback: MutationCallback) {
+        super(callback);
+        observers.push(this);
+      }
+    },
+  );
   Object.defineProperty(window, 'top', { value: window, configurable: true });
 });
 
 afterEach(() => {
+  observers.splice(0).forEach((observer) => observer.disconnect());
   vi.unstubAllGlobals();
   document.body.innerHTML = '';
 });
