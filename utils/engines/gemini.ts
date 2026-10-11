@@ -1,4 +1,5 @@
-import { DEFAULT_MODEL_IDS, type ModelId } from '../models';
+import { resolveSelectedModel } from '../models';
+import type { ModelId } from '../model-catalog';
 import type { TranslationEngine } from './types';
 import {
   buildTranslationPrompt,
@@ -78,8 +79,8 @@ async function callGeminiAPI(
 }
 
 export const geminiEngine: TranslationEngine = {
-  async translate(apiKey, paragraphs, mode, subtitleContext, lang, modelId) {
-    const model = modelId ?? DEFAULT_MODEL_IDS.gemini;
+  async translate(apiKey, paragraphs, mode, subtitleContext, lang, modelId, catalog) {
+    const model = resolveSelectedModel('gemini', modelId, catalog);
     if (mode === 'segment') {
       const prompt = buildSegmentationPrompt(paragraphs);
       const { text, usage } = await callGeminiAPI(apiKey, prompt, model);

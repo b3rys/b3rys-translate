@@ -1,4 +1,4 @@
-import type { ModelId } from './models';
+import type { ModelId } from './model-catalog';
 import type { TranslationRequestMode } from './translation-types';
 
 export function buildTranslationCachePrefix(

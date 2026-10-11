@@ -1,8 +1,12 @@
-import { MODEL_CATALOG } from '@/utils/models';
+import { modelCatalog } from '@/utils/models';
+import type { ModelCatalog } from '@/utils/model-catalog';
 
-export function populateModelSelect(select: HTMLSelectElement): void {
+export function populateModelSelect(
+  select: HTMLSelectElement,
+  catalog: ModelCatalog = modelCatalog,
+): void {
   select.replaceChildren();
-  for (const model of MODEL_CATALOG) {
+  for (const model of catalog.models) {
     const option = document.createElement('option');
     option.value = model.id;
     option.textContent = model.label;
@@ -10,7 +14,10 @@ export function populateModelSelect(select: HTMLSelectElement): void {
   }
 }
 
-export function renderModelPricingTable(container: HTMLElement): void {
+export function renderModelPricingTable(
+  container: HTMLElement,
+  catalog: ModelCatalog = modelCatalog,
+): void {
   const title = document.createElement('div');
   title.className = 'info-tooltip-title';
   title.textContent = '모델 가격 · Input / Output · USD per 1M tokens';
@@ -26,7 +33,7 @@ export function renderModelPricingTable(container: HTMLElement): void {
   head.appendChild(headRow);
 
   const body = document.createElement('tbody');
-  for (const model of MODEL_CATALOG) {
+  for (const model of catalog.models) {
     const row = document.createElement('tr');
     const name = document.createElement('td');
     name.textContent = model.label;

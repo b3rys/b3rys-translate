@@ -1,3 +1,4 @@
+import type { ModelId } from '@/utils/model-catalog';
 import type { EngineType } from '@/utils/engines/types';
 import { ENGINE_DISPLAY_NAMES } from '@/utils/engines/types';
 import {
@@ -5,7 +6,6 @@ import {
   getModelConfig,
   normalizeSelectedModels,
   resolveSelectedModel,
-  type ModelId,
   type SelectedModels,
 } from '@/utils/models';
 import { populateModelSelect, renderModelPricingTable } from './model-ui';

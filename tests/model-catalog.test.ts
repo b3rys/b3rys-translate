@@ -23,7 +23,7 @@ describe('model catalog', () => {
     expect(getModelsForEngine('upstage').map((model) => model.label)).toEqual([
       'Upstage Solar Mini',
     ]);
-    // 5개다. Gemini 3.5 Flash Lite 는 씽킹을 끌 수 없어 제외했다(utils/models.ts 주석).
+    // 5개다. Gemini 3.5 Flash Lite 는 씽킹을 끌 수 없어 제외했다(config/README.md).
     // Upstage Solar Mini 는 공급사가 "reasoning 미지원"을 명시해 통과했다.
     expect(MODEL_CATALOG).toHaveLength(5);
   });

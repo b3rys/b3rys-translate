@@ -1,4 +1,4 @@
-import type { ModelId } from '../models';
+import type { ModelCatalog, ModelId } from '../model-catalog';
 import type { TranslationRequestMode } from '../translation-types';
 
 export type EngineType = 'gemini' | 'openai' | 'anthropic' | 'upstage';
@@ -21,6 +21,7 @@ export interface TranslationEngine {
     subtitleContext?: { original: string; translated: string }[],
     lang?: { sourceLang?: string; targetLang?: string },
     modelId?: ModelId,
+    catalog?: ModelCatalog,
   ): Promise<TranslateResult>;
 }
 

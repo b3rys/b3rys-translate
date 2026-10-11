@@ -1,5 +1,5 @@
 import { ENGINE_ENDPOINTS } from '../constants';
-import { DEFAULT_MODEL_IDS } from '../models';
+import { resolveSelectedModel } from '../models';
 import type { TranslationEngine } from './types';
 import {
   buildTranslationPrompt,
@@ -61,8 +61,8 @@ function readUsage(
 }
 
 export const upstageEngine: TranslationEngine = {
-  async translate(apiKey, paragraphs, mode, subtitleContext, lang, modelId) {
-    const model = modelId ?? DEFAULT_MODEL_IDS.upstage;
+  async translate(apiKey, paragraphs, mode, subtitleContext, lang, modelId, catalog) {
+    const model = resolveSelectedModel('upstage', modelId, catalog);
 
     if (mode === 'segment') {
       const data: UpstageResponse = await (
