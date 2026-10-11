@@ -29,7 +29,9 @@ export function detectTextBlocks(root: Element = document.body): TextBlock[] {
   // Phase 0: Custom selectors (site-specific, replaces standard detection)
   const rule = getSiteRule();
   if (rule?.translateSelectors?.length) {
-    return detectSelectorBlocks(root, rule.translateSelectors, rule.splitParagraphs === true);
+    return splitBRParagraphs(
+      detectSelectorBlocks(root, rule.translateSelectors, rule.splitParagraphs === true),
+    );
   }
 
   // onlyWithin: restrict detection to content areas (whitelist approach)
@@ -48,7 +50,7 @@ export function detectTextBlocks(root: Element = document.body): TextBlock[] {
         );
         allBlocks.push(...filtered, ...leafBlocks);
       }
-      return allBlocks;
+      return splitBRParagraphs(allBlocks);
     }
     // No matching containers → fall through to normal detection
   }
@@ -61,7 +63,60 @@ export function detectTextBlocks(root: Element = document.body): TextBlock[] {
   // Phase 2: Text containers missed by Phase 1 (nav menus, sidebars, bios)
   const leafBlocks = detectLeafTextBlocks(root, splitParagraphs);
 
-  return [...filtered, ...leafBlocks];
+  return splitBRParagraphs([...filtered, ...leafBlocks]);
+}
+
+/** Split direct consecutive BRs without wrapping, cloning or moving source nodes. */
+function splitBRParagraphs(blocks: TextBlock[]): TextBlock[] {
+  return blocks.flatMap((block) => {
+    const el = block.element;
+    // Nested semantic/interactive content must keep its existing detection path.
+    if (!hasOnlyInlineChildren(el)) return [block];
+    const nodes = Array.from(el.childNodes);
+    const runs: { nodes: Node[]; before: Node | null }[] = [];
+    let start = 0;
+    for (let i = 0; i < nodes.length; i++) {
+      if (nodes[i].nodeName !== 'BR') continue;
+      let end = i + 1;
+      let breaks = 1;
+      // Formatting whitespace/comments between BRs do not create a paragraph.
+      while (end < nodes.length) {
+        const next = nodes[end];
+        if (next.nodeName === 'BR') breaks++;
+        else if (
+          next.nodeType !== Node.COMMENT_NODE &&
+          !(next.nodeType === Node.TEXT_NODE && !next.textContent?.trim())
+        )
+          break;
+        end++;
+      }
+      if (breaks >= 2) {
+        runs.push({ nodes: nodes.slice(start, i), before: nodes[i] });
+        start = end;
+      }
+      i = end - 1;
+    }
+    if (!runs.length) return [block];
+    runs.push({ nodes: nodes.slice(start), before: null });
+    const paragraphs = runs
+      .map((run) => ({
+        ...run,
+        text: getDirectText(el, run.nodes).trim(),
+        html: getDirectHTML(el, run.nodes).trim(),
+      }))
+      .filter((run) => run.text);
+    if (paragraphs.length < 2) return [block];
+    return paragraphs.map((run, index) => {
+      const id = `${block.id}-p${index}`;
+      return {
+        id,
+        element: el,
+        text: run.text,
+        html: run.html,
+        segment: { id, before: run.before },
+      };
+    });
+  });
 }
 
 /**
@@ -698,9 +753,9 @@ function isTextCollectionBoundary(child: HTMLElement): boolean {
 }
 
 /** Get text content excluding boundary children (recursive) */
-function getDirectText(el: HTMLElement): string {
+function getDirectText(el: HTMLElement, nodes: Iterable<Node> = el.childNodes): string {
   let text = '';
-  for (const child of el.childNodes) {
+  for (const child of nodes) {
     if (child.nodeType === Node.TEXT_NODE) {
       text += child.textContent;
     } else if (child.nodeType === Node.ELEMENT_NODE) {
@@ -780,9 +835,9 @@ function serializeForAPI(el: HTMLElement): string {
  * 3366px-tall translated node. Text nodes with any non-space character are
  * kept verbatim.
  */
-function getDirectHTML(el: HTMLElement): string {
+function getDirectHTML(el: HTMLElement, nodes: Iterable<Node> = el.childNodes): string {
   let html = '';
-  for (const child of el.childNodes) {
+  for (const child of nodes) {
     if (child.nodeType === Node.TEXT_NODE) {
       const text = child.textContent ?? '';
       html += /^\s*$/.test(text) ? ' ' : escapeText(text);
