@@ -6,9 +6,12 @@ import { observeDynamicContent } from '@/entrypoints/content/observer';
 import { setupChromeMock } from './helpers/chrome-mock';
 
 const cleanups: (() => void)[] = [];
-const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
+// Yield through a timer turn so native MutationObserver microtasks, including
+// notifications queued by a repair, finish before the next DOM mutation.
+const settle = () => vi.advanceTimersByTimeAsync(0);
 
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
   document.body.replaceChildren();
   setupChromeMock();
   vi.stubGlobal('speechSynthesis', { getVoices: () => [], cancel: vi.fn() });
@@ -17,6 +20,8 @@ beforeEach(() => {
 afterEach(() => {
   destroySelectionPopup();
   cleanups.splice(0).forEach((cleanup) => cleanup());
+  vi.clearAllTimers();
+  vi.useRealTimers();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   document.body.replaceChildren();
@@ -38,7 +43,8 @@ describe('persistent extension UI', () => {
 
     document.body.replaceChildren(document.createElement('main'));
 
-    await vi.waitFor(() => expect(host.parentElement).toBe(document.body));
+    await settle();
+    expect(host.parentElement).toBe(document.body);
     expect(document.querySelectorAll('#b3rys-translate-root')).toHaveLength(1);
     expect(button.dataset.state).toBe('done');
     expect(shadow.querySelector('.b3rys-mode-toggle')!.textContent).toBe('가');
@@ -53,7 +59,8 @@ describe('persistent extension UI', () => {
     const host = document.getElementById('b3rys-translate-root')!;
     fab.hide();
     host.remove();
-    await vi.waitFor(() => expect(host.isConnected).toBe(true));
+    await settle();
+    expect(host.isConnected).toBe(true);
     expect(host.style.display).toBe('none');
     fab.show();
     expect(host.style.display).toBe('');
@@ -73,16 +80,17 @@ describe('persistent extension UI', () => {
     await settle();
     const newBody = document.createElement('body');
     document.documentElement.appendChild(newBody);
-    await vi.waitFor(() => expect(host.parentElement).toBe(newBody));
+    await settle();
+    expect(host.parentElement).toBe(newBody);
   });
 
   it('stops a site-removal loop after three repairs in one second', async () => {
-    vi.spyOn(performance, 'now').mockReturnValue(100);
     const host = document.createElement('div');
     cleanups.push(mountPersistentUiHost(host));
     for (let i = 0; i < 3; i++) {
       host.remove();
-      await vi.waitFor(() => expect(host.isConnected).toBe(true));
+      await settle();
+      expect(host.isConnected).toBe(true);
     }
     host.remove();
     await settle();
@@ -93,13 +101,13 @@ describe('persistent extension UI', () => {
   });
 
   it('does not count repairs outside the rolling one-second window', async () => {
-    const clock = vi.spyOn(performance, 'now');
     const host = document.createElement('div');
     cleanups.push(mountPersistentUiHost(host));
     for (let i = 0; i < 5; i++) {
-      clock.mockReturnValue(i * 1001);
+      await vi.advanceTimersByTimeAsync(1001);
       host.remove();
-      await vi.waitFor(() => expect(host.isConnected).toBe(true));
+      await settle();
+      expect(host.isConnected).toBe(true);
     }
   });
 
@@ -109,8 +117,9 @@ describe('persistent extension UI', () => {
     const host = document.createElement('div');
     cleanups.push(mountPersistentUiHost(host));
     host.remove();
-    await vi.waitFor(() => expect(host.isConnected).toBe(true));
-    await new Promise((resolve) => setTimeout(resolve, 600));
+    await settle();
+    expect(host.isConnected).toBe(true);
+    await vi.advanceTimersByTimeAsync(600);
     expect(changed).not.toHaveBeenCalled();
   });
 
@@ -129,9 +138,8 @@ describe('persistent extension UI', () => {
     } as unknown as Selection);
     initSelectionPopup();
     document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
-    await vi.waitFor(() =>
-      expect(document.getElementById('b3rys-selection-popup-root')).not.toBeNull(),
-    );
+    await vi.advanceTimersByTimeAsync(10);
+    expect(document.getElementById('b3rys-selection-popup-root')).not.toBeNull();
     const host = document.getElementById('b3rys-selection-popup-root')!;
     const shadow = attach.mock.results[0].value as ShadowRoot;
     const trigger = shadow.querySelector('button')!;
@@ -139,13 +147,19 @@ describe('persistent extension UI', () => {
 
     document.body.replaceChildren();
 
-    await vi.waitFor(() => expect(host.parentElement).toBe(document.body));
+    await settle();
+    expect(host.parentElement).toBe(document.body);
     expect(shadow.querySelector('button')).toBe(trigger);
     trigger.click();
-    await vi.waitFor(() => expect(shadow.textContent).toContain('안녕하세요'));
+    await settle();
+    expect(shadow.textContent).toContain('안녕하세요');
     const popup = shadow.querySelector('.b3rys-sel-popup');
+    // test:ui-host-gc exposes GC to catch happy-dom's orphaned callback regression.
+    // The regular suite still checks this path without forcing a collection.
+    await globalThis.gc?.({ execution: 'async' });
     host.remove();
-    await vi.waitFor(() => expect(host.isConnected).toBe(true));
+    await settle();
+    expect(host.isConnected).toBe(true);
     expect(shadow.querySelector('.b3rys-sel-popup')).toBe(popup);
     expect(chrome.runtime.sendMessage).toHaveBeenCalledOnce();
     destroySelectionPopup();
