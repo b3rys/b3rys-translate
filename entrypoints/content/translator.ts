@@ -656,7 +656,7 @@ async function injectCachedTranslations(blocks: TextBlock[], gen: number): Promi
         const injectSlice = () => {
           while (i < hitBlocks.length && performance.now() < sliceEnd) {
             const block = hitBlocks[i++];
-            injectTranslation(block.element, hits.get(block.id)!);
+            injectTranslation(block.element, hits.get(block.id)!, block.segment);
             recordInjection(block.text, Date.now(), isScrollDriven());
           }
         };
@@ -876,7 +876,7 @@ async function processBatch(batch: TextBlock[], gen: number): Promise<void> {
         for (const result of response.translations) {
           const block = blockMap.get(result.id);
           if (block) {
-            injectTranslation(block.element, result.translatedText);
+            injectTranslation(block.element, result.translatedText, block.segment);
             recordInjection(block.text, Date.now(), isScrollDriven());
           }
         }
@@ -944,7 +944,27 @@ export function findTextLabel(container: HTMLElement, blockText: string): HTMLEl
   return deepest;
 }
 
-export function injectTranslation(element: HTMLElement, translatedText: string): void {
+export function injectTranslation(
+  element: HTMLElement,
+  translatedText: string,
+  segment?: TextBlock['segment'],
+): void {
+  if (segment) {
+    // A stale separator means the page replaced this paragraph while translating.
+    if (segment.before && segment.before.parentNode !== element) return;
+    element.querySelectorAll('[data-b3rys-segment]').forEach((previous) => {
+      if (previous.getAttribute('data-b3rys-segment') === segment.id) previous.remove();
+    });
+    const span = document.createElement('span');
+    span.setAttribute(DATA_ATTRS.TRANSLATED, 'true');
+    span.setAttribute('data-b3rys-segment', segment.id);
+    span.className = 'b3rys-translation';
+    span.innerHTML = sanitizeHTML(translatedText);
+    preserveBlankLines(span);
+    markOriginalContent(element);
+    element.insertBefore(span, segment.before);
+    return;
+  }
   removePriorTranslation(element);
 
   const text = element.textContent?.trim() ?? '';

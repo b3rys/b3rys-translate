@@ -45,3 +45,20 @@
 
 - [ ] 위 전부 통과 후에만: 버전 bump → PR/머지 → `npm run zip` → GitHub Release
 - [ ] 웹스토어: 심사 대기 중인 이전 버전에 **알려진 버그가 포함돼 있으면 교체 업로드**
+
+## BR-delimited paragraph regression
+
+| Feature                                      | Source                                                | Automated verification                                                                                     | Manual check / gap                                                                                                                                                                                                    |
+| -------------------------------------------- | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| One translation per consecutive-BR paragraph | `text-detector.ts`, `translator.ts`, `types/index.ts` | `npx vitest run tests/br-paragraphs.test.ts` — 11 cases; reverting detector + injector produces 9 failures | On the OpenAI deleted/deactivated account help article, translate Overview, switch parallel/replace, toggle off/on. Confirm each translation is below its source and links remain usable. Live-browser check pending. |
+
+The fixture reproduces the reported child-node order (five BR boundaries, six text
+segments), not a verbatim copy of the article. A single BR remains inside its
+paragraph. Original nodes retain their parents in parallel mode; replace mode
+uses the existing temporary text wrappers, and purge restores the original nodes.
+
+Verification for v0.5.35: 462 tests pass (451 existing + 11 new). The regression
+suite covers network, cache, mixed results, insertion order, repeat injection,
+replace/parallel/off/purge, original node identity, and unchanged ordinary P/single
+BR behavior. Only direct BR boundaries in inline-only hosts are split; breaks
+nested inside an inline element retain the existing behavior.

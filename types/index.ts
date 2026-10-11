@@ -3,6 +3,8 @@ export interface TextBlock {
   element: HTMLElement;
   text: string;
   html: string;
+  /** Paragraph inside a shared host; insert before its separator (null = end). */
+  segment?: { id: string; before: Node | null };
 }
 
 export interface TranslationResult {
