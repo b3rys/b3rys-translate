@@ -1,3 +1,4 @@
+import type { ModelId } from '@/utils/model-catalog';
 import { getEngine } from '@/utils/engines';
 import type { EngineType } from '@/utils/engines/types';
 import type { UsageData } from '@/utils/engines/types';
@@ -26,9 +27,9 @@ import {
 } from '@/utils/constants';
 import {
   SELECTED_MODELS_KEY,
+  modelCatalog,
   calculateModelCost,
   resolveSelectedModel,
-  type ModelId,
   type SelectedModels,
 } from '@/utils/models';
 import { buildTranslationCachePrefix } from '@/utils/translation-context';
@@ -194,7 +195,7 @@ function recordUsage(modelId: ModelId, usage: UsageData): void {
   stats[modelId] = {
     inputTokens: prev.inputTokens + usage.inputTokens,
     outputTokens: prev.outputTokens + usage.outputTokens,
-    estimatedCost: prev.estimatedCost + calculateModelCost(modelId, usage),
+    estimatedCost: prev.estimatedCost + calculateModelCost(modelId, usage, modelCatalog),
     requestCount: prev.requestCount + 1,
   };
   scheduleUsageFlush();
@@ -273,7 +274,7 @@ async function handleCacheLookup(
     selectedModels?: SelectedModels;
   }>(['selectedEngine', SELECTED_MODELS_KEY]);
   const engineType = selectedEngine || 'gemini';
-  const modelId = resolveSelectedModel(engineType, selectedModels?.[engineType]);
+  const modelId = resolveSelectedModel(engineType, selectedModels?.[engineType], modelCatalog);
   const prefix = buildTranslationCachePrefix(
     await resolveTargetLang(msgTargetLang),
     'page',
@@ -307,7 +308,7 @@ async function handleTranslateBatch(
   const lang = { sourceLang, targetLang };
 
   const engineType: EngineType = selectedEngine || 'gemini';
-  const modelId = resolveSelectedModel(engineType, selectedModels?.[engineType]);
+  const modelId = resolveSelectedModel(engineType, selectedModels?.[engineType], modelCatalog);
 
   const apiKey = engineApiKeys?.[engineType];
 
@@ -340,7 +341,15 @@ async function handleTranslateBatch(
       return { translations: [], error: rateLimitError };
     }
     const engine = getEngine(engineType);
-    const result = await engine.translate(apiKey, paragraphs, 'segment', undefined, lang, modelId);
+    const result = await engine.translate(
+      apiKey,
+      paragraphs,
+      'segment',
+      undefined,
+      lang,
+      modelId,
+      modelCatalog,
+    );
 
     if (result.usage) {
       recordUsage(modelId, result.usage);
@@ -386,6 +395,7 @@ async function handleTranslateBatch(
     subtitleContext,
     lang,
     modelId,
+    modelCatalog,
   );
 
   // Store new translations in cache

@@ -1,5 +1,5 @@
 import { ENGINE_ENDPOINTS } from '../constants';
-import { DEFAULT_MODEL_IDS } from '../models';
+import { resolveSelectedModel } from '../models';
 import type { TranslationEngine } from './types';
 import {
   buildTranslationPrompt,
@@ -18,8 +18,8 @@ interface OpenAIResponse {
 }
 
 export const openaiEngine: TranslationEngine = {
-  async translate(apiKey, paragraphs, mode, subtitleContext, lang, modelId) {
-    const model = modelId ?? DEFAULT_MODEL_IDS.openai;
+  async translate(apiKey, paragraphs, mode, subtitleContext, lang, modelId, catalog) {
+    const model = resolveSelectedModel('openai', modelId, catalog);
     if (mode === 'segment') {
       const prompt = buildSegmentationPrompt(paragraphs);
       const response = await callWithRetry(() =>

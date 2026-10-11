@@ -1,5 +1,5 @@
 import { ENGINE_ENDPOINTS } from '../constants';
-import { DEFAULT_MODEL_IDS } from '../models';
+import { resolveSelectedModel } from '../models';
 import type { TranslationEngine } from './types';
 import {
   buildTranslationPrompt,
@@ -46,8 +46,8 @@ export function assertUsable(data: AnthropicResponse): void {
 }
 
 export const anthropicEngine: TranslationEngine = {
-  async translate(apiKey, paragraphs, mode, subtitleContext, lang, modelId) {
-    const model = modelId ?? DEFAULT_MODEL_IDS.anthropic;
+  async translate(apiKey, paragraphs, mode, subtitleContext, lang, modelId, catalog) {
+    const model = resolveSelectedModel('anthropic', modelId, catalog);
     if (mode === 'segment') {
       const prompt = buildSegmentationPrompt(paragraphs);
       const response = await callWithRetry(() =>
