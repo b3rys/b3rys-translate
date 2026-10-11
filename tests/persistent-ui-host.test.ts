@@ -154,6 +154,9 @@ describe('persistent extension UI', () => {
     await settle();
     expect(shadow.textContent).toContain('안녕하세요');
     const popup = shadow.querySelector('.b3rys-sel-popup');
+    // test:ui-host-gc exposes GC to catch happy-dom's orphaned callback regression.
+    // The regular suite still checks this path without forcing a collection.
+    await globalThis.gc?.({ execution: 'async' });
     host.remove();
     await settle();
     expect(host.isConnected).toBe(true);
