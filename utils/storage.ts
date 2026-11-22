@@ -1,3 +1,5 @@
+import { modelCatalog } from './models';
+import type { ModelCatalog } from './model-catalog';
 import type { EngineType } from './engines/types';
 import { SELECTED_MODELS_KEY, normalizeSelectedModels, type SelectedModels } from './models';
 
@@ -59,7 +61,7 @@ export async function setTranslationEnabled(enabled: boolean): Promise<void> {
  * 1. Old API keys that lived in sync (geminiApiKey / engineApiKeys) → local.
  * 2. Wipe any settings a prior version left orphaned in sync.
  */
-export async function migrateStorage(): Promise<void> {
+export async function migrateStorage(catalog: ModelCatalog = modelCatalog): Promise<void> {
   const syncData = await chrome.storage.sync.get(['geminiApiKey', 'engineApiKeys']);
   const localData = await chrome.storage.local.get<{
     engineApiKeys?: Partial<Record<EngineType, string>>;
@@ -70,7 +72,7 @@ export async function migrateStorage(): Promise<void> {
 
   // Persist explicit model replacements and fill missing/invalid selections
   // with engine defaults. Already-current choices are preserved on repeat runs.
-  const selectedModels = normalizeSelectedModels(localData.selectedModels);
+  const selectedModels = normalizeSelectedModels(localData.selectedModels, catalog);
   if (JSON.stringify(selectedModels) !== JSON.stringify(localData.selectedModels || {})) {
     await chrome.storage.local.set({ [SELECTED_MODELS_KEY]: selectedModels });
   }

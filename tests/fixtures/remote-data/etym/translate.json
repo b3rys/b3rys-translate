@@ -1,0 +1,43 @@
+{
+  "word": "translate",
+  "ipa": "/trænzˈleɪt/",
+  "gloss_ko": "번역하다",
+  "uncertain": [],
+  "kind": "story",
+  "story": {
+    "scene_image": "images/translate.svg",
+    "known": [
+      "트랜스퍼(transfer, 옮겨 타기)와 같은 집안이에요. 둘 다 라틴어 trānsferō 에서 왔어요. 앞의 trāns- 은 영어 through(지나서)와도 같은 뿌리예요."
+    ],
+    "motion": "trāns- 건너 + lātus 짊어진·옮겨진. 원래 그림은 짐을 등에 지고 강을 건너 저쪽에 내려놓은 것이에요.",
+    "line": "뜻을 등에 지고 말의 강을 건너, 저쪽 말에 그대로 내려놓기 — 그게 번역이에요."
+  },
+  "roots": [
+    {
+      "form": "trāns-",
+      "lang": "Latin",
+      "meaning_ko": "건너",
+      "next": "trans"
+    },
+    {
+      "form": "lātus",
+      "lang": "Latin",
+      "meaning_ko": "짊어진·옮겨진",
+      "next": "latus"
+    }
+  ],
+  "sources": [
+    {
+      "name": "Wiktionary",
+      "url": "https://en.wiktionary.org/wiki/translate"
+    },
+    {
+      "name": "Wiktionary",
+      "url": "https://en.wiktionary.org/wiki/translatus"
+    },
+    {
+      "name": "Wiktionary",
+      "url": "https://en.wiktionary.org/wiki/latus"
+    }
+  ]
+}

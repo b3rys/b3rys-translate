@@ -1,0 +1,62 @@
+{
+  "word": "telescope",
+  "ipa": "/ˈtɛlɪskəʊp/",
+  "gloss_ko": "망원경",
+  "uncertain": [],
+  "kind": "hanja",
+  "hanja": {
+    "ko": "망원경",
+    "chars": [
+      {
+        "ch": "望",
+        "hun_eum": "바랄 망(바라보다)"
+      },
+      {
+        "ch": "遠",
+        "hun_eum": "멀 원"
+      },
+      {
+        "ch": "鏡",
+        "hun_eum": "거울 경"
+      }
+    ],
+    "pairs": [
+      {
+        "ko": "멀리",
+        "ch": "遠 원",
+        "root": "tele-",
+        "origin": "τῆλε"
+      },
+      {
+        "ko": "보다",
+        "ch": "望 망",
+        "root": "-scope",
+        "origin": "σκοπέω"
+      }
+    ]
+  },
+  "roots": [
+    {
+      "form": "tele-",
+      "lang": "Greek",
+      "meaning_ko": "멀리",
+      "next": "tele"
+    },
+    {
+      "form": "-scope",
+      "lang": "Greek",
+      "meaning_ko": "보다",
+      "next": "skopeo"
+    }
+  ],
+  "sources": [
+    {
+      "name": "Wiktionary",
+      "url": "https://en.wiktionary.org/wiki/telescope"
+    },
+    {
+      "name": "Wiktionary",
+      "url": "https://en.wiktionary.org/wiki/-scope"
+    }
+  ]
+}

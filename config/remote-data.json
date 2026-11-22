@@ -1,0 +1,6 @@
+{
+  "dev": { "indexUrl": "http://127.0.0.1:8766/index.json" },
+  "prod": { "indexUrl": null },
+  "refreshMs": 600000,
+  "timeoutMs": 2000
+}

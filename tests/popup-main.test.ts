@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { setupChromeMock } from './helpers/chrome-mock';
+import models from '../config/models.json';
 import { SELECTED_MODELS_KEY } from '@/utils/models';
 
 const popupHtml = readFileSync(resolve(__dirname, '../entrypoints/popup/index.html'), 'utf-8')
@@ -73,6 +74,30 @@ describe('popup model wiring', () => {
       });
       expect(apiKey.value).toBe('••••••••-key');
       expect(badge.textContent).toBe('Gemini 3.1 Flash Lite');
+    });
+  });
+  it('opens settings with a new remote model id and shows its key and price', async () => {
+    setupChromeMock({
+      localStorage: {
+        selectedEngine: 'openai',
+        engineApiKeys: { openai: 'existing-key-1234' },
+      },
+    });
+    const remote = structuredClone(models);
+    remote.models[1].id = 'remote-openai-model';
+    remote.models[1].label = 'Remote OpenAI';
+    (chrome.runtime.sendMessage as ReturnType<typeof vi.fn>).mockResolvedValue({ catalog: remote });
+    await import('@/entrypoints/popup/main');
+    document.dispatchEvent(new Event('DOMContentLoaded'));
+    await vi.waitFor(() => {
+      expect((document.getElementById('engine-select') as HTMLSelectElement).value).toBe(
+        'remote-openai-model',
+      );
+      expect(document.querySelector('.badge-model')?.textContent).toBe('Remote OpenAI');
+      expect((document.getElementById('api-key') as HTMLInputElement).placeholder).toBe(
+        'Remote OpenAI API key',
+      );
+      expect((document.getElementById('api-key') as HTMLInputElement).value).toBe('••••••••1234');
     });
   });
 });

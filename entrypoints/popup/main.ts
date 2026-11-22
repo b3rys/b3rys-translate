@@ -1,3 +1,5 @@
+import { loadModelCatalog } from '@/utils/model-catalog';
+import bundledModels from '../../config/models.json';
 import type { ModelId } from '@/utils/model-catalog';
 import type { EngineType } from '@/utils/engines/types';
 import { ENGINE_DISPLAY_NAMES } from '@/utils/engines/types';
@@ -37,6 +39,15 @@ interface EngineUsageStats {
 type UsageStats = Partial<Record<string, EngineUsageStats>>;
 
 document.addEventListener('DOMContentLoaded', async () => {
+  let catalog = loadModelCatalog(bundledModels);
+  try {
+    const response = await chrome.runtime.sendMessage({ type: 'GET_MODEL_CATALOG' });
+    // Revalidate the transport response before exposing model ids in settings.
+    const parsed = loadModelCatalog(response?.catalog);
+    if (!parsed.diagnostics.length) catalog = parsed;
+  } catch {
+    /* Background unavailable: bundled settings remain usable. */
+  }
   // 매니페스트에서 읽는다. HTML 에 손으로 적으면 버전을 올릴 때마다 어긋나고,
   // 그러면 "지금 어느 빌드가 도는지" 를 이 표시로 판별할 수 없다.
   const versionLabel = document.getElementById('version-label');
@@ -90,8 +101,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   }>('engineApiKeys');
 
   const currentEngine: EngineType = selectedEngine || 'gemini';
-  const modelSelections = normalizeSelectedModels(selectedModels);
-  let currentModel = resolveSelectedModel(currentEngine, modelSelections[currentEngine]);
+  const modelSelections = normalizeSelectedModels(selectedModels, catalog);
+  let currentModel = resolveSelectedModel(currentEngine, modelSelections[currentEngine], catalog);
   const keys: Partial<Record<EngineType, string>> = engineApiKeys || {};
 
   // Check for API key error message from content script
@@ -122,8 +133,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Build model dropdown + price-only tooltip from single-source metadata.
   const engineTooltip = document.getElementById('engine-tooltip') as HTMLSpanElement;
-  populateModelSelect(engineSelect);
-  renderModelPricingTable(engineTooltip);
+  populateModelSelect(engineSelect, catalog);
+  renderModelPricingTable(engineTooltip, catalog);
 
   engineSelect.value = currentModel;
   loadKeyForEngine(currentEngine);
@@ -172,7 +183,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Model selection change. Provider-scoped API keys remain unchanged.
   engineSelect.addEventListener('change', async () => {
-    const model = getModelConfig(engineSelect.value as ModelId);
+    const model = getModelConfig(engineSelect.value as ModelId, catalog);
     const engine = model.engine;
     currentModel = model.id;
     modelSelections[engine] = model.id;
@@ -189,7 +200,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const key = apiKeyInput.value.trim();
     if (!key || key.startsWith('••••')) return;
 
-    const engine = getModelConfig(engineSelect.value as ModelId).engine;
+    const engine = getModelConfig(engineSelect.value as ModelId, catalog).engine;
     try {
       keys[engine] = key;
       await chrome.storage.local.set({ engineApiKeys: { ...keys } });
@@ -202,7 +213,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Delete API key
   deleteButton.addEventListener('click', async () => {
-    const engine = getModelConfig(engineSelect.value as ModelId).engine;
+    const engine = getModelConfig(engineSelect.value as ModelId, catalog).engine;
     delete keys[engine];
     await chrome.storage.local.set({ engineApiKeys: { ...keys } });
     apiKeyInput.value = '';
@@ -275,11 +286,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       apiKeyInput.value = '';
       keyStatus.className = 'status';
     }
-    apiKeyInput.placeholder = `${getModelConfig(currentModel).label} API key`;
+    apiKeyInput.placeholder = `${getModelConfig(currentModel, catalog).label} API key`;
   }
 
   function updateBadge(modelId: ModelId) {
-    const model = getModelConfig(modelId);
+    const model = getModelConfig(modelId, catalog);
     badgeModel.textContent = model.label;
     badgeLink.href = ENGINE_KEY_URLS[model.engine];
     keyIssueLink.href = ENGINE_KEY_URLS[model.engine];
@@ -401,7 +412,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const row = document.createElement('tr');
       let label: string;
       try {
-        label = getModelConfig(usageKey as ModelId).label;
+        label = getModelConfig(usageKey as ModelId, catalog).label;
       } catch {
         label = ENGINE_DISPLAY_NAMES[usageKey as EngineType] ?? usageKey;
       }

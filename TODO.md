@@ -1,3 +1,11 @@
+## Tolk remote data — development checkpoint (paused)
+
+- [x] JSON index/word loading, persistent cache, version invalidation and fallback
+- [x] Development fixture server, translate/story and telescope/hanja fixtures
+- [x] Background model snapshot and settings integration; scoped checks and mutants
+- [ ] Resume against the new project/repository and saved-word server contract
+- [ ] Final independent review, Chrome verification and PR after resumption
+
 # b3rys translate — TODO
 
 ---

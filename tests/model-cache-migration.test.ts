@@ -1,3 +1,8 @@
+// These migration checks isolate translation-cache behavior from dev data fetches.
+vi.mock('@/utils/remote-data-runtime', async () => {
+  const { modelCatalog } = await import('@/utils/models');
+  return { remoteData: { getCatalog: async () => modelCatalog } };
+});
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { setupChromeMock } from './helpers/chrome-mock';
 import type { EngineType } from '@/utils/engines/types';

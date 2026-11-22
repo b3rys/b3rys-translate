@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 120" class="scene" aria-hidden="true">
+  <circle class="sc-line" cx="40" cy="70" r="7"/><path class="sc-line" d="M40 77v24M40 84l14-8"/>
+  <path class="sc-line" d="M50 74l54-22 6 12-54 22z"/>
+  <path class="sc-arrow" d="M118 56l150-30" stroke-dasharray="4 6"/>
+  <circle class="sc-load" cx="282" cy="24" r="12"/><path class="sc-line" d="M0 104h320" opacity=".4"/>
+ </svg>

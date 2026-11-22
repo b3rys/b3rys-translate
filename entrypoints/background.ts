@@ -1,4 +1,5 @@
-import type { ModelId } from '@/utils/model-catalog';
+import { remoteData } from '@/utils/remote-data-runtime';
+import type { ModelCatalog, ModelId } from '@/utils/model-catalog';
 import { getEngine } from '@/utils/engines';
 import type { EngineType } from '@/utils/engines/types';
 import type { UsageData } from '@/utils/engines/types';
@@ -8,6 +9,7 @@ import type {
   CacheLookupResponse,
   ClearCacheResponse,
   FrameToggleMessage,
+  RemoteDataResponse,
 } from '@/utils/messaging';
 import {
   loadCache,
@@ -27,7 +29,6 @@ import {
 } from '@/utils/constants';
 import {
   SELECTED_MODELS_KEY,
-  modelCatalog,
   calculateModelCost,
   resolveSelectedModel,
   type SelectedModels,
@@ -67,9 +68,11 @@ function checkRateLimit(): string | null {
   return null;
 }
 
+let storageReady: Promise<void> = Promise.resolve();
+
 export default defineBackground(() => {
   loadCache();
-  migrateStorage();
+  storageReady = remoteData.getCatalog().then((catalog) => migrateStorage(catalog));
 
   // The popup can reset usage or change the cost limit by writing storage.local
   // directly. Adopt such external changes so the in-memory accumulator doesn't
@@ -91,9 +94,22 @@ export default defineBackground(() => {
       message: BackgroundMessage,
       sender: chrome.runtime.MessageSender,
       sendResponse: (
-        response: TranslateBatchResponse | CacheLookupResponse | ClearCacheResponse,
+        response:
+          | TranslateBatchResponse
+          | CacheLookupResponse
+          | ClearCacheResponse
+          | RemoteDataResponse,
       ) => void,
     ) => {
+      if (message.type === 'GET_MODEL_CATALOG') {
+        remoteData.getCatalog(true).then((catalog) => sendResponse({ catalog }));
+        return true;
+      }
+      if (message.type === 'GET_ETYMOLOGY') {
+        remoteData.getEtymology(message.word).then((etymology) => sendResponse({ etymology }));
+        return true;
+      }
+
       if (message.type === 'RELAY_FRAME_TOGGLE') {
         // Fan the top frame's FAB intent out to the sender's own tab. Without
         // a frameId, tabs.sendMessage reaches every frame of that tab; the
@@ -184,7 +200,7 @@ async function getUsageStats(): Promise<UsageStats> {
 }
 
 /** Accumulate a batch's usage in memory and schedule a coalesced flush. */
-function recordUsage(modelId: ModelId, usage: UsageData): void {
+function recordUsage(modelId: ModelId, usage: UsageData, modelCatalog: ModelCatalog): void {
   const stats = usageStatsCache ?? (usageStatsCache = {});
   const prev = stats[modelId] || {
     inputTokens: 0,
@@ -269,6 +285,8 @@ async function handleCacheLookup(
   msgTargetLang?: string,
 ): Promise<CacheLookupResponse> {
   await loadCache();
+  await storageReady;
+  const modelCatalog = await remoteData.getCatalog();
   const { selectedEngine, selectedModels } = await chrome.storage.local.get<{
     selectedEngine?: EngineType;
     selectedModels?: SelectedModels;
@@ -295,6 +313,8 @@ async function handleTranslateBatch(
   msgSourceLang?: string,
   msgTargetLang?: string,
 ): Promise<TranslateBatchResponse> {
+  await storageReady;
+  const modelCatalog = await remoteData.getCatalog();
   const { selectedEngine, selectedModels, engineApiKeys } = await chrome.storage.local.get<{
     selectedEngine?: EngineType;
     selectedModels?: SelectedModels;
@@ -352,7 +372,7 @@ async function handleTranslateBatch(
     );
 
     if (result.usage) {
-      recordUsage(modelId, result.usage);
+      recordUsage(modelId, result.usage, modelCatalog);
     }
 
     const newTotal = await getTotalCost(stats);
@@ -409,7 +429,7 @@ async function handleTranslateBatch(
 
   // Accumulate usage stats (coalesced flush — see recordUsage)
   if (result.usage) {
-    recordUsage(modelId, result.usage);
+    recordUsage(modelId, result.usage, modelCatalog);
   }
 
   const newTotal = await getTotalCost(stats);

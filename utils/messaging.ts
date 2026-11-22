@@ -1,3 +1,5 @@
+import type { ModelCatalog } from './model-catalog';
+import type { Etymology } from './etymology';
 import type { TranslationRequestMode } from './translation-types';
 
 export interface TranslateBatchRequest {
@@ -86,7 +88,18 @@ export interface ClearCacheResponse {
   success: boolean;
 }
 
+export interface RemoteCatalogRequest {
+  type: 'GET_MODEL_CATALOG';
+}
+export interface EtymologyRequest {
+  type: 'GET_ETYMOLOGY';
+  word: string;
+}
+export type RemoteDataResponse = { catalog: ModelCatalog } | { etymology: Etymology | null };
+
 export type BackgroundMessage =
+  | RemoteCatalogRequest
+  | EtymologyRequest
   | TranslateBatchRequest
   | CacheLookupRequest
   | OpenPopupRequest

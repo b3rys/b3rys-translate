@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 120" class="scene" aria-hidden="true">
+  <path class="sc-water" d="M0 96c14-6 26 6 40 0s26 6 40 0 26 6 40 0 26 6 40 0 26 6 40 0 26 6 40 0 26 6 40 0 26 6 40 0"/>
+  <path class="sc-water" d="M10 110c14-6 26 6 40 0s26 6 40 0 26 6 40 0 26 6 40 0 26 6 40 0 26 6 40 0 26 6 40 0" opacity=".5"/>
+  <path class="sc-line" d="M20 84 Q160 30 300 84"/><path class="sc-line" d="M14 84h292"/>
+  <path class="sc-line" d="M60 84V66M100 84V52M140 84V46M180 84V46M220 84V52M260 84V66" opacity=".55"/>
+  <g class="sc-walker"><circle class="sc-line" cx="142" cy="20" r="6"/><path class="sc-line" d="M142 26v18M142 44l-6 14M142 44l7 13M142 31l-8 7M142 31l8 4"/>
+  <rect class="sc-load" x="146" y="16" width="18" height="16" rx="3"/></g>
+  <path class="sc-arrow" d="M196 18h40M228 12l8 6-8 6"/>
+ </svg>
