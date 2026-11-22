@@ -1,6 +1,6 @@
 {
   "name": "b3rys-translate",
-  "version": "0.5.39",
+  "version": "0.5.40",
   "description": "Bilingual translation Chrome extension — original text with translation below, plus YouTube dual subtitles",
   "type": "module",
   "license": "Apache-2.0",
@@ -23,7 +23,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepare": "husky",
-    "test:ui-host-gc": "vitest run tests/persistent-ui-host.test.ts --execArgv=--expose-gc"
+    "test:ui-host-gc": "vitest run tests/persistent-ui-host.test.ts --execArgv=--expose-gc",
+    "healthcheck": "node scripts/healthcheck.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",

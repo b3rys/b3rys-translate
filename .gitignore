@@ -35,3 +35,6 @@ dist
 .claude/agents/fix-engineer.md
 .claude/agents/qa-verifier.md
 .claude/agents/report-analyst.md
+
+# Local health check configuration and private reports
+.healthcheck/
