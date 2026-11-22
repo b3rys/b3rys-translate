@@ -39,7 +39,12 @@ and retryable errors. It checks for nonempty Korean output and returned thinking
 blocks, including blocks discarded by the production parser. Reasoning usage
 counters alone do not indicate returned thinking. This is a smoke test, not a
 translation quality evaluation. Network timeout is 30 seconds per model; the
-headless suite timeout is 120 seconds.
+headless suite timeout is 120 seconds. Request parsing/token-limit setup errors
+are reported as `probe_setup_failed` before any provider request is made.
+With a 64-token limit, `invalid_translation` with empty/truncated output can
+suggest reasoning consumed the output budget; this is a diagnostic clue, not
+proof of thinking. Upstage has no default key variable and is skipped for lack
+of a key unless a key file is explicitly configured.
 
 ## Results and notification
 

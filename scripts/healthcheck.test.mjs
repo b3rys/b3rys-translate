@@ -99,6 +99,28 @@ describe('weekly health check', () => {
     expect(JSON.stringify(result)).not.toContain('env-test-value');
   });
 
+  it.each([undefined, { body: 'invalid-json' }, { body: '{}' }])(
+    'reports malformed Gemini request setup without calling the provider (%j)',
+    async (options) => {
+      const original = globalThis.fetch;
+      const network = vi.fn();
+      const engine = () => ({
+        translate: async () => {
+          const response = await globalThis.fetch('https://example.invalid', options);
+          if (!response.ok) throw new Error('engine rejected probe response');
+          return { translations: [] };
+        },
+      });
+      const result = await probe({ id: 'm', engine: 'gemini' }, undefined, engine, network, {
+        GEMINI_API_KEY: 'unit-test-value',
+      });
+      expect(result).toMatchObject({ status: 'fail', detail: 'probe_setup_failed' });
+      expect(network).not.toHaveBeenCalled();
+      expect(globalThis.fetch).toBe(original);
+      expect(JSON.stringify(result)).not.toContain('unit-test-value');
+    },
+  );
+
   it('never makes a second paid request when an engine retries', async () => {
     const temp = await mkdtemp(join(tmpdir(), 'health-unit-'));
     const keyFile = join(temp, 'key');

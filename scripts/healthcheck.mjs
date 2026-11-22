@@ -56,20 +56,24 @@ export async function probe(
   let calls = 0;
   let thinking = false;
   let httpStatus;
+  let setupFailed = false;
   globalThis.fetch = async (url, options) => {
     // Keep the production request builder/parser, but cap the health probe at
     // one paid request per model even when the engine retries internally.
     if (++calls > 1) throw new Error('healthcheck_request_limit');
-    const body = JSON.parse(options.body);
-    if (model.engine === 'gemini') body.generationConfig.maxOutputTokens = 64;
-    else if (model.engine === 'openai') body.max_completion_tokens = 64;
-    else body.max_tokens = 64;
+    let requestStarted = false;
     try {
-      const response = await request(url, {
+      const body = JSON.parse(options.body);
+      if (model.engine === 'gemini') body.generationConfig.maxOutputTokens = 64;
+      else if (model.engine === 'openai') body.max_completion_tokens = 64;
+      else body.max_tokens = 64;
+      const requestOptions = {
         ...options,
         body: JSON.stringify(body),
         signal: globalThis.AbortSignal.timeout(30000),
-      });
+      };
+      requestStarted = true;
+      const response = await request(url, requestOptions);
       httpStatus = response.status;
       thinking = hasThinking(await response.clone().json());
       // The production engine retries 429/5xx. A probe records the original
@@ -80,6 +84,7 @@ export async function probe(
         });
       return response;
     } catch {
+      setupFailed ||= !requestStarted;
       return new globalThis.Response('{"error":{"message":"healthcheck_request_failed"}}', {
         status: 400,
       });
@@ -99,10 +104,16 @@ export async function probe(
     const valid = httpStatus >= 200 && httpStatus < 300 && /[가-힣]/.test(text);
     return {
       ...result,
-      status: valid && !thinking ? 'pass' : 'fail',
+      status: valid && !thinking && !setupFailed ? 'pass' : 'fail',
       thinking,
       latencyMs: Math.round(performance.now() - started),
-      detail: thinking ? 'thinking_block_returned' : valid ? 'translated' : 'invalid_translation',
+      detail: setupFailed
+        ? 'probe_setup_failed'
+        : thinking
+          ? 'thinking_block_returned'
+          : valid
+            ? 'translated'
+            : 'invalid_translation',
     };
   } catch {
     // Provider errors may echo credentials or request bodies. Never persist them.
@@ -111,9 +122,11 @@ export async function probe(
       status: 'fail',
       thinking,
       latencyMs: Math.round(performance.now() - started),
-      detail: httpStatus
-        ? `provider_http_${httpStatus}_or_invalid_response`
-        : 'request_failed_or_timeout',
+      detail: setupFailed
+        ? 'probe_setup_failed'
+        : httpStatus
+          ? `provider_http_${httpStatus}_or_invalid_response`
+          : 'request_failed_or_timeout',
     };
   } finally {
     globalThis.fetch = original;
