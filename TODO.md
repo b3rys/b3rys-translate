@@ -122,3 +122,7 @@
 파일 목록은 `tests/` 디렉토리 참조.
 
 ---
+
+## Weekly health check
+
+- [ ] Weekly model translation probes, YouTube/selection regression checks, failure-only notification; schedule pending confirmation.
